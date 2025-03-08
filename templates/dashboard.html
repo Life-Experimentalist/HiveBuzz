@@ -1,0 +1,99 @@
+{% extends 'base.html' %} {% block title %}Dashboard - HiveBuzz{% endblock %} {%
+block content %}
+<div class="dashboard">
+	<div class="welcome-section">
+		<h2>Welcome, @{{ username }}!</h2>
+		<p>
+			Welcome to HiveBuzz, your decentralized social media platform built
+			on the Hive blockchain.
+		</p>
+	</div>
+
+	<div class="stats-section">
+		<div class="stat-card">
+			<div class="stat-icon">📊</div>
+			<div class="stat-info">
+				<h3>Your Activity</h3>
+				<p>Track your engagement on the Hive blockchain</p>
+			</div>
+		</div>
+		<div class="stat-card">
+			<div class="stat-icon">💰</div>
+			<div class="stat-info">
+				<h3>Earnings</h3>
+				<p>See how much you've earned from your content</p>
+			</div>
+		</div>
+		<div class="stat-card">
+			<div class="stat-icon">👥</div>
+			<div class="stat-info">
+				<h3>Network</h3>
+				<p>Your followers and the accounts you follow</p>
+			</div>
+		</div>
+	</div>
+
+	<div class="dashboard-actions">
+		<a href="{{ url_for('posts') }}" class="action-card">
+			<div class="action-icon">📝</div>
+			<div class="action-info">
+				<h3>View Feed</h3>
+				<p>Check out the latest posts from the community</p>
+			</div>
+		</a>
+		<a href="{{ url_for('create_post') }}" class="action-card">
+			<div class="action-icon">✏️</div>
+			<div class="action-info">
+				<h3>Create Post</h3>
+				<p>Share your thoughts with the Hive community</p>
+			</div>
+		</a>
+		<a
+			href="{{ url_for('profile', username=username) }}"
+			class="action-card"
+		>
+			<div class="action-icon">👤</div>
+			<div class="action-info">
+				<h3>My Profile</h3>
+				<p>View your profile information</p>
+			</div>
+		</a>
+	</div>
+
+	<div class="recent-activity">
+		<h3>Recent Activity</h3>
+		<div id="activity-feed" class="loading">
+			<div class="spinner"></div>
+			<p>Loading your recent activity...</p>
+		</div>
+	</div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+	// Simulate loading recent activity
+	document.addEventListener("DOMContentLoaded", function () {
+		const activityFeed = document.getElementById("activity-feed");
+
+		// Simulate API call delay
+		setTimeout(function () {
+			activityFeed.innerHTML = `
+                <div class="activity-item">
+                    <div class="activity-icon">👍</div>
+                    <div class="activity-details">
+                        <p>You upvoted <a href="#">Welcome to HiveBuzz</a></p>
+                        <span class="activity-time">Just now</span>
+                    </div>
+                </div>
+                <div class="activity-item">
+                    <div class="activity-icon">✏️</div>
+                    <div class="activity-details">
+                        <p>You created a post <a href="#">Hello Hive World</a></p>
+                        <span class="activity-time">Yesterday</span>
+                    </div>
+                </div>
+            `;
+			activityFeed.classList.remove("loading");
+		}, 1500);
+	});
+</script>
+{% endblock %}

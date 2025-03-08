@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>{% block title %}HiveBuzz{% endblock %}</title>
+		<link
+			rel="stylesheet"
+			href="{{ url_for('static', filename='css/style.css') }}"
+		/>
+		<script src="https://unpkg.com/hive-keychain@latest/dist/hive-keychain.min.js"></script>
+		{% block head %}{% endblock %}
+	</head>
+	<body>
+		<header class="site-header">
+			<div class="container">
+				<div class="header-left">
+					<h1 class="site-title">
+						<a href="{{ url_for('index') }}">HiveBuzz</a>
+					</h1>
+				</div>
+				<div class="header-right">
+					{% if session.username %}
+					<div class="user-info">
+						<span>@{{ session.username }}</span>
+						<a href="{{ url_for('logout') }}" class="logout-btn"
+							>Logout</a
+						>
+					</div>
+					{% endif %}
+				</div>
+			</div>
+		</header>
+
+		{% if session.username %}
+		<nav class="main-nav">
+			<div class="container">
+				<a
+					href="{{ url_for('posts') }}"
+					class="nav-link {% if request.path == '/posts' %}active{% endif %}"
+					>Feed</a
+				>
+				<a
+					href="{{ url_for('trending') }}"
+					class="nav-link {% if request.path == '/trending' %}active{% endif %}"
+					>Trending</a
+				>
+				<a
+					href="{{ url_for('create_post') }}"
+					class="nav-link {% if request.path == '/create' %}active{% endif %}"
+					>Create Post</a
+				>
+				<a
+					href="{{ url_for('profile', username=session.username) }}"
+					class="nav-link {% if '/profile/' in request.path %}active{% endif %}"
+					>My Profile</a
+				>
+			</div>
+		</nav>
+		{% endif %}
+
+		<!-- Flash messages -->
+		{% with messages = get_flashed_messages(with_categories=true) %} {% if
+		messages %}
+		<div class="flash-messages container">
+			{% for category, message in messages %}
+			<div class="flash-message {{ category }}">{{ message }}</div>
+			{% endfor %}
+		</div>
+		{% endif %} {% endwith %}
+
+		<main class="main-content">
+			<div class="container">{% block content %}{% endblock %}</div>
+		</main>
+
+		<footer class="site-footer">
+			<div class="container">
+				<p>&copy; {{ now.year }} HiveBuzz</p>
+			</div>
+		</footer>
+
+		<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+		{% block scripts %}{% endblock %}
+	</body>
+</html>

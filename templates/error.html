@@ -1,0 +1,8 @@
+{% extends 'base.html' %} {% block title %}Error - HiveBuzz{% endblock %} {%
+block content %}
+<div class="error-container">
+	<h2>Something Went Wrong</h2>
+	<p class="error-message">{{ error }}</p>
+	<a href="{{ url_for('index') }}" class="btn">Return to Home</a>
+</div>
+{% endblock %}

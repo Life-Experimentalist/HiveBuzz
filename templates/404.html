@@ -1,0 +1,23 @@
+{% extends 'base.html' %} {% block title %}Page Not Found - HiveBuzz{% endblock
+%} {% block content %}
+<div class="error-container text-center">
+	<div class="error-code">404</div>
+	<h2>Page Not Found</h2>
+	<p class="error-description">
+		The page you are looking for does not exist or has been moved.
+	</p>
+	<div class="error-actions">
+		<a href="{{ url_for('index') }}" class="btn">Return to Home</a>
+		<a href="{{ url_for('posts') }}" class="btn btn-secondary"
+			>Browse Posts</a
+		>
+	</div>
+	<div class="error-image">
+		<img
+			src="{{ url_for('static', filename='images/404.svg') }}"
+			alt="Page not found illustration"
+			width="300"
+		/>
+	</div>
+</div>
+{% endblock %}

@@ -1,0 +1,156 @@
+{% extends 'base.html' %} {% block title %}{{ user.name }} Profile - HiveBuzz{%
+endblock %} {% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %} {% block content %}
+<div class="profile-container">
+	<div class="profile-header">
+		{% if metadata.profile and metadata.profile.profile_image %}
+		<img
+			src="{{ metadata.profile.profile_image }}"
+			alt="{{ user.name }}"
+			class="profile-image"
+		/>
+		{% else %}
+		<img
+			src="https://via.placeholder.com/150"
+			alt="{{ user.name }}"
+			class="profile-image"
+		/>
+		{% endif %}
+
+		<div class="profile-details">
+			<h2>@{{ user.name }}</h2>
+
+			{% if metadata.profile and metadata.profile.about %}
+			<p class="profile-bio">{{ metadata.profile.about }}</p>
+			{% endif %}
+
+			<div class="profile-stats">
+				<div class="stat-item">
+					<span class="stat-value">{{ user.post_count or 0 }}</span>
+					<span class="stat-label">Posts</span>
+				</div>
+				<div class="stat-item">
+					<span class="stat-value"
+						>{{ user.follower_count or 0 }}</span
+					>
+					<span class="stat-label">Followers</span>
+				</div>
+				<div class="stat-item">
+					<span class="stat-value"
+						>{{ user.following_count or 0 }}</span
+					>
+					<span class="stat-label">Following</span>
+				</div>
+				<div class="stat-item">
+					<span class="stat-value"
+						>{{ user.reputation|default('0') }}</span
+					>
+					<span class="stat-label">Reputation</span>
+				</div>
+			</div>
+
+			<div class="profile-wallet mt-4">
+				<h4>Wallet</h4>
+				<div class="wallet-balances">
+					<div class="balance-item">
+						<span class="balance-label">HIVE</span>
+						<span class="balance-value"
+							>{{ user.balance|default('0 HIVE') }}</span
+						>
+					</div>
+					<div class="balance-item">
+						<span class="balance-label">HBD</span>
+						<span class="balance-value"
+							>{{ user.hbd_balance|default('0 HBD') }}</span
+						>
+					</div>
+					<div class="balance-item">
+						<span class="balance-label">SP</span>
+						<span class="balance-value"
+							>{{ user.vesting_shares|default('0 SP') }}</span
+						>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	{% if session.username == user.name %}
+	<div class="profile-activity-chart">
+		<h3>Activity Overview</h3>
+		<canvas id="activityChart" width="400" height="100"></canvas>
+	</div>
+	{% endif %}
+
+	<div class="profile-content">
+		<h3>Recent Activity</h3>
+		{% if recent_posts %}
+		<div class="recent-posts">
+			{% for post in recent_posts %}
+			<div class="post-item">
+				<a
+					href="{{ url_for('view_post', author=post.author, permlink=post.permlink) }}"
+					class="post-title-link"
+				>
+					<h4>{{ post.title }}</h4>
+				</a>
+				<div class="post-meta">
+					<span
+						>Posted: {{ post.created|default('Unknown date')
+						}}</span
+					>
+				</div>
+				<p class="post-excerpt">
+					{% if post.body|length > 150 %} {{ post.body[:150] }}... {%
+					else %} {{ post.body }} {% endif %}
+				</p>
+			</div>
+			{% endfor %}
+		</div>
+		{% else %}
+		<p class="placeholder-text">No recent activity found</p>
+		{% endif %}
+	</div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+	document.addEventListener('DOMContentLoaded', function() {
+	    {% if session.username == user.name %}
+	    // Create activity chart for the user's own profile
+	    const ctx = document.getElementById('activityChart');
+	    if (ctx) {
+	        const chartData = {
+	            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+	            datasets: [{
+	                label: 'Posts',
+	                data: [3, 1, 4, 0, 2, 5, 1],
+	                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+	                borderColor: 'rgba(54, 162, 235, 1)',
+	                borderWidth: 1
+	            }, {
+	                label: 'Comments',
+	                data: [5, 7, 2, 3, 8, 9, 2],
+	                backgroundColor: 'rgba(255, 99, 132, 0.5)',
+	                borderColor: 'rgba(255, 99, 132, 1)',
+	                borderWidth: 1
+	            }]
+	        };
+
+	        new Chart(ctx, {
+	            type: 'bar',
+	            data: chartData,
+	            options: {
+	                responsive: true,
+	                scales: {
+	                    y: {
+	                        beginAtZero: true
+	                    }
+	                }
+	            }
+	        });
+	    }
+	    {% endif %}
+	});
+</script>
+{% endblock %}
