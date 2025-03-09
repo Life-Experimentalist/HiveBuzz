@@ -13,7 +13,7 @@ class HiveAuth {
 	}
 
 	generateUUID() {
-		return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+		return "xxxxxxxx-xxxx-4xxx-Xxxx-xxxxxxxxxxxx".replace(
 			/[xy]/g,
 			function (c) {
 				const r = (Math.random() * 16) | 0,
@@ -288,3 +288,146 @@ document.addEventListener("DOMContentLoaded", function () {
 		});
 	}
 });
+
+/**
+ * HiveAuth helper for integrating with the HiveAuth mobile app authentication
+ */
+const HiveAuthHelper = {
+    /**
+     * Initialize HiveAuth and setup auth data
+     * @param {string} username - Hive username
+     * @param {string} appName - Application name to show in HiveAuth
+     * @returns {Object} Authentication data including token, uuid, and QR info
+     */
+    initAuth: function(username, appName = "HiveBuzz") {
+        // Generate random tokens
+        const token = this.generateRandomString(16);
+        const uuid = this.generateUUID();
+
+        // Create auth data object
+        const authData = {
+            username,
+            token,
+            uuid,
+            app: appName,
+            challenge: `Login to ${appName}: ${token}`
+        };
+
+        // Convert to base64 for QR code
+        const authString = btoa(JSON.stringify(authData));
+        const authUrl = `hiveauth://login/${authString}`;
+
+        return {
+            username,
+            token,
+            uuid,
+            authString,
+            authUrl
+        };
+    },
+
+    /**
+     * Generate QR code for HiveAuth
+     * @param {HTMLElement} element - Element to render QR code in
+     * @param {string} authUrl - HiveAuth URL for QR
+     * @param {Object} options - QRCode options
+     * @returns {Promise} Resolves when QR code is generated
+     */
+    generateQRCode: function(element, authUrl, options = { width: 200 }) {
+        return new Promise((resolve, reject) => {
+            if (!window.QRCode) {
+                return reject("QRCode library not loaded");
+            }
+
+            QRCode.toCanvas(element, authUrl, options, function(error) {
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve();
+                }
+            });
+        });
+    },
+
+    /**
+     * Check authentication status from server
+     * @param {string} username - Hive username
+     * @param {string} token - Authentication token
+     * @param {string} uuid - Authentication UUID
+     * @returns {Promise} Authentication status check result
+     */
+    checkAuthStatus: function(username, token, uuid) {
+        const params = new URLSearchParams({
+            username,
+            auth_token: token,
+            uuid
+        });
+
+        return fetch(`/api/check-hiveauth?${params.toString()}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            });
+    },
+
+    /**
+     * Start polling for authentication status
+     * @param {string} username - Hive username
+     * @param {string} token - Authentication token
+     * @param {string} uuid - Authentication UUID
+     * @param {function} onSuccess - Callback when authentication succeeds
+     * @param {function} onTimeout - Callback when authentication times out
+     * @param {number} interval - Polling interval in ms
+     * @param {number} timeout - Timeout in ms
+     */
+    pollForAuth: function(username, token, uuid, onSuccess, onTimeout, interval = 2000, timeout = 120000) {
+        const startTime = Date.now();
+        const checkInterval = setInterval(() => {
+            // Check if we've timed out
+            if (Date.now() - startTime > timeout) {
+                clearInterval(checkInterval);
+                if (onTimeout) onTimeout();
+                return;
+            }
+
+            // Check auth status
+            this.checkAuthStatus(username, token, uuid)
+                .then(data => {
+                    if (data.authenticated) {
+                        clearInterval(checkInterval);
+                        if (onSuccess) onSuccess(data);
+                    }
+                })
+                .catch(error => console.error("Auth check error:", error));
+        }, interval);
+
+        // Return the interval ID so it can be cleared if needed
+        return checkInterval;
+    },
+
+    /**
+     * Generate a random string for tokens
+     * @param {number} length - Length of string to generate
+     * @returns {string} Random string
+     */
+    generateRandomString: function(length = 16) {
+        return Math.random().toString(36).substring(2, 2 + length);
+    },
+
+    /**
+     * Generate a UUID v4
+     * @returns {string} UUID
+     */
+    generateUUID: function() {
+        return 'xxxxxxxx-xxxx-4xxx-Xxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+};
+
+// Make it globally available
+window.HiveAuthHelper = HiveAuthHelper;

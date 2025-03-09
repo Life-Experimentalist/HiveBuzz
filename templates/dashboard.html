@@ -1,99 +1,314 @@
-{% extends 'base.html' %} {% block title %}Dashboard - HiveBuzz{% endblock %} {%
-block content %}
-<div class="dashboard">
-	<div class="welcome-section">
-		<h2>Welcome, @{{ username }}!</h2>
-		<p>
-			Welcome to HiveBuzz, your decentralized social media platform built
-			on the Hive blockchain.
-		</p>
-	</div>
+{% extends 'base.html' %}
+{% block title %}Dashboard - HiveBuzz{% endblock %}
 
-	<div class="stats-section">
-		<div class="stat-card">
-			<div class="stat-icon">📊</div>
-			<div class="stat-info">
-				<h3>Your Activity</h3>
-				<p>Track your engagement on the Hive blockchain</p>
-			</div>
-		</div>
-		<div class="stat-card">
-			<div class="stat-icon">💰</div>
-			<div class="stat-info">
-				<h3>Earnings</h3>
-				<p>See how much you've earned from your content</p>
-			</div>
-		</div>
-		<div class="stat-card">
-			<div class="stat-icon">👥</div>
-			<div class="stat-info">
-				<h3>Network</h3>
-				<p>Your followers and the accounts you follow</p>
-			</div>
-		</div>
-	</div>
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4">Dashboard</h1>
 
-	<div class="dashboard-actions">
-		<a href="{{ url_for('posts') }}" class="action-card">
-			<div class="action-icon">📝</div>
-			<div class="action-info">
-				<h3>View Feed</h3>
-				<p>Check out the latest posts from the community</p>
-			</div>
-		</a>
-		<a href="{{ url_for('create_post') }}" class="action-card">
-			<div class="action-icon">✏️</div>
-			<div class="action-info">
-				<h3>Create Post</h3>
-				<p>Share your thoughts with the Hive community</p>
-			</div>
-		</a>
-		<a
-			href="{{ url_for('profile', username=username) }}"
-			class="action-card"
-		>
-			<div class="action-icon">👤</div>
-			<div class="action-info">
-				<h3>My Profile</h3>
-				<p>View your profile information</p>
-			</div>
-		</a>
-	</div>
+    {% if is_demo %}
+    <div class="alert alert-info alert-dismissible fade show mb-4" role="alert">
+        <i class="bi bi-info-circle-fill me-2"></i>
+        You are currently using a demo account. Data shown is simulated and not from the actual blockchain.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
 
-	<div class="recent-activity">
-		<h3>Recent Activity</h3>
-		<div id="activity-feed" class="loading">
-			<div class="spinner"></div>
-			<p>Loading your recent activity...</p>
-		</div>
-	</div>
+    <div class="row">
+        <!-- Left Column: User Info & Stats -->
+        <div class="col-lg-4 mb-4">
+            <!-- User Profile Card -->
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <img src="https://images.hive.blog/u/{{ user.username }}/avatar" class="avatar-lg mb-3 rounded-circle" alt="{{ user.username }}">
+                    <h4 class="mb-1">@{{ user.username }}</h4>
+                    <p class="text-muted">{{ user.name if user.name else 'Hive User' }}</p>
+                    <div class="d-flex justify-content-center">
+                        <a href="{{ url_for('profile', username=user.username) }}" class="btn btn-sm btn-outline-primary">View Profile</a>
+                        {% if not is_demo %}
+                        <a href="https://hive.blog/@{{ user.username }}" target="_blank" class="btn btn-sm btn-outline-secondary ms-2">
+                            <i class="bi bi-box-arrow-up-right"></i> Hive Blog
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Card -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Account Stats</h5>
+                    {% if not is_demo %}
+                    <button id="refresh-stats" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <div class="row g-0">
+                        <div class="col-4 text-center border-end">
+                            <h6>Followers</h6>
+                            <div class="h4">{{ stats.followers }}</div>
+                        </div>
+                        <div class="col-4 text-center border-end">
+                            <h6>Following</h6>
+                            <div class="h4">{{ stats.following }}</div>
+                        </div>
+                        <div class="col-4 text-center">
+                            <h6>Posts</h6>
+                            <div class="h4">{{ stats.posts_count }}</div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>Reputation</span>
+                            <span class="badge bg-success">{{ stats.reputation }}</span>
+                        </div>
+                    </div>
+                    {% if not is_demo %}
+                    <div class="text-center mt-3">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle me-1"></i> Data from Hive blockchain
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Wallet Quick View -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Wallet</h5>
+                    <a href="{{ url_for('wallet') }}" class="btn btn-sm btn-outline-primary">Full View</a>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span><i class="bi bi-currency-exchange me-2"></i> HIVE</span>
+                        <span class="fw-bold">{{ stats.wallet.hive }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span><i class="bi bi-lightning-charge me-2"></i> Hive Power</span>
+                        <span class="fw-bold">{{ stats.wallet.hp }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-cash-coin me-2"></i> HBD</span>
+                        <span class="fw-bold">{{ stats.wallet.hbd }}</span>
+                    </div>
+                    {% if not is_demo %}
+                    <div class="text-center mt-3">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle me-1"></i> Real-time wallet data
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+                {% if not is_demo %}
+                <div class="card-footer p-2">
+                    <div class="d-flex justify-content-center gap-2">
+                        <button class="btn btn-sm btn-outline-primary wallet-action-btn" data-action="power-up">
+                            <i class="bi bi-arrow-up-circle me-1"></i> Power Up
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary wallet-action-btn" data-action="transfer">
+                            <i class="bi bi-arrow-left-right me-1"></i> Transfer
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right Column: Activity & Trending -->
+        <div class="col-lg-8">
+            <!-- Recent Activity -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Recent Activity</h5>
+                    <button id="refresh-activity" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% if activity %}
+                            {% for item in activity %}
+                                <div class="list-group-item d-flex align-items-center">
+                                    <div class="activity-icon me-3">
+                                        {% if item.type == 'post' %}
+                                            <i class="bi bi-file-earmark-text"></i>
+                                        {% elif item.type == 'view' %}
+                                            <i class="bi bi-eye"></i>
+                                        {% elif item.type == 'auth' %}
+                                            <i class="bi bi-key"></i>
+                                        {% else %}
+                                            <i class="bi bi-activity"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        {% if item.link %}
+                                            <a href="{{ item.link }}" class="activity-title">{{ item.title }}</a>
+                                        {% else %}
+                                            <span class="activity-title">{{ item.title }}</span>
+                                        {% endif %}
+                                        <div class="activity-time text-muted small">{{ item.time }}</div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="list-group-item text-center py-4">
+                                <p class="mb-0 text-muted">No recent activity</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-footer text-end">
+                    <a href="{{ url_for('transactions') }}" class="btn btn-sm btn-outline-primary">
+                        View Transactions
+                    </a>
+                </div>
+            </div>
+
+            <!-- Trending Posts - Now with scrollable container -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Trending Posts</h5>
+                    <a href="{{ url_for('posts') }}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    <!-- Scrollable posts container -->
+                    <div class="trending-posts-container">
+                        {% if trending %}
+                            <div class="trending-posts-scroll">
+                                {% for post in trending %}
+                                    <div class="trending-post-item p-3 {% if not loop.last %}border-bottom{% endif %}">
+                                        <div class="d-flex">
+                                            <!-- Post image or placeholder -->
+                                            <div class="trending-post-image me-3">
+                                                {% if post.image %}
+                                                    <a href="{{ url_for('view_post', author=post.author, permlink=post.permlink) }}">
+                                                        <img src="{{ post.image }}" alt="Post image" class="rounded"
+                                                            onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/placeholder.jpg') }}';">
+                                                    </a>
+                                                {% else %}
+                                                    <a href="{{ url_for('view_post', author=post.author, permlink=post.permlink) }}" class="text-decoration-none">
+                                                        <div class="post-image-placeholder rounded">
+                                                            <i class="bi bi-file-earmark-text"></i>
+                                                        </div>
+                                                    </a>
+                                                {% endif %}
+                                            </div>
+
+                                            <!-- Post content -->
+                                            <div class="trending-post-content">
+                                                <h6 class="trending-post-title mb-1">
+                                                    <a href="{{ url_for('view_post', author=post.author, permlink=post.permlink) }}" class="text-decoration-none">
+                                                        {{ post.title|truncate(60) }}
+                                                    </a>
+                                                </h6>
+                                                <div class="post-meta mb-2 small">
+                                                    <a href="{{ url_for('profile', username=post.author) }}" class="text-decoration-none">
+                                                        @{{ post.author }}
+                                                    </a>
+                                                    <span class="text-muted"> •
+                                                        {% if post.created is string %}
+                                                            {{ post.created[:10] }}
+                                                        {% else %}
+                                                            {{ post.created.strftime('%Y-%m-%d') if post.created else 'Recent' }}
+                                                        {% endif %}
+                                                    </span>
+                                                </div>
+
+                                                <!-- Change from plain text to markdown rendering -->
+                                                <div class="trending-post-excerpt markdown-preview mb-2">
+                                                    {{ post.body|markdown|striptags|truncate(100) }}
+                                                </div>
+
+                                                <div class="d-flex justify-content-between align-items-center small">
+                                                    <div class="post-stats">
+                                                        <span><i class="bi bi-chat-dots me-1"></i>{{ post.comment_count }}</span>
+                                                        <span class="ms-2"><i class="bi bi-hand-thumbs-up me-1"></i>{{ post.vote_count }}</span>
+                                                    </div>
+                                                    <span class="text-success">{{ post.payout }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <!-- Scroll indicators - only shown when content overflows -->
+                            <div class="scroll-controls">
+                                <button class="scroll-btn scroll-left" aria-label="Scroll up">
+                                    <i class="bi bi-chevron-up"></i>
+                                </button>
+                                <button class="scroll-btn scroll-right" aria-label="Scroll down">
+                                    <i class="bi bi-chevron-down"></i>
+                                </button>
+                            </div>
+                        {% else %}
+                            <div class="p-4 text-center">
+                                <p class="mb-0 text-muted">No trending posts available</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-footer text-end">
+                    <a href="{{ url_for('create_post') }}" class="btn btn-primary">
+                        <i class="bi bi-pencil-square me-1"></i>Create Post
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-{% endblock %} {% block scripts %}
-<script>
-	// Simulate loading recent activity
-	document.addEventListener("DOMContentLoaded", function () {
-		const activityFeed = document.getElementById("activity-feed");
+{% endblock %}
 
-		// Simulate API call delay
-		setTimeout(function () {
-			activityFeed.innerHTML = `
-                <div class="activity-item">
-                    <div class="activity-icon">👍</div>
-                    <div class="activity-details">
-                        <p>You upvoted <a href="#">Welcome to HiveBuzz</a></p>
-                        <span class="activity-time">Just now</span>
-                    </div>
-                </div>
-                <div class="activity-item">
-                    <div class="activity-icon">✏️</div>
-                    <div class="activity-details">
-                        <p>You created a post <a href="#">Hello Hive World</a></p>
-                        <span class="activity-time">Yesterday</span>
-                    </div>
-                </div>
-            `;
-			activityFeed.classList.remove("loading");
-		}, 1500);
-	});
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard-styles.css') }}">
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/hive-keychain.js') }}"></script>
+
+{% if not is_demo %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get username from the page
+    const username = "{{ user.username }}";
+
+    // Use our helper to detect keychain properly
+    const isKeychainAvailable = typeof window.hive_keychain !== 'undefined';
+
+    // Stats refresh functionality
+    const refreshStatsBtn = document.getElementById('refresh-stats');
+    if (refreshStatsBtn) {
+        refreshStatsBtn.addEventListener('click', function() {
+            // Show loading spinner
+            const originalHtml = refreshStatsBtn.innerHTML;
+            refreshStatsBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+            refreshStatsBtn.disabled = true;
+
+            // Reload the page to refresh stats
+            window.location.reload();
+        });
+    }
+
+    // Wallet action buttons functionality
+    const walletActionBtns = document.querySelectorAll('.wallet-action-btn');
+    walletActionBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const action = this.getAttribute('data-action');
+
+            // Check if Hive Keychain is available
+            if (!isKeychainAvailable) {
+                alert('Hive Keychain browser extension is required for this action.\n\nPlease install it from the Chrome Web Store or Firefox Add-ons store.');
+                return;
+            }
+
+            // Redirect to wallet page with specific action
+            window.location.href = `{{ url_for('wallet') }}#${action}`;
+        });
+    });
+});
 </script>
+{% endif %}
 {% endblock %}
