@@ -198,32 +198,29 @@ class PostsCache:
             logger.error(f"Error saving cache to file {cache_file}: {e}")
 
     def start(self) -> None:
-        """Start the background refresh thread and perform initial cache load"""
+        """Start background refresh thread and perform initial (nonblocking) cache load"""
         if not self.running:
             self.running = True
 
             # First, try to load cached data from files
             logger.info("Loading cached posts from disk")
             for feed_type in self.cache.keys():
-                if self._load_cache_from_file(feed_type):
-                    # Mark feed as initialized if we have data
-                    if self.cache[feed_type]["posts"]:
-                        if feed_type in STARTUP_PRIORITY_FEEDS:
-                            self.initialized = True
+                self._load_cache_from_file(feed_type)
 
-            # If we couldn't load priority feeds from disk, do a blocking load
-            if not self.initialized:
-                logger.info(
-                    "No valid cache files found for priority feeds, loading from API"
-                )
-                self._load_priority_feeds()
-                logger.info("Priority feeds loaded")
+            # Instead of blocking on priority feeds, launch them in background
+            logger.info("Starting background priority feed refresh")
+            threading.Thread(
+                target=self._load_priority_feeds,
+                name="PriorityFeedsThread",
+                daemon=True,
+            ).start()
 
-            # Then start background thread for continuous updates
+            # Then start continuous background refresh loop
             self.refresh_thread = threading.Thread(
-                target=self._background_refresh_loop, name="PostsCacheRefreshThread"
+                target=self._background_refresh_loop,
+                name="PostsCacheRefreshThread",
+                daemon=True,
             )
-            self.refresh_thread.daemon = True
             self.refresh_thread.start()
             logger.info("Posts cache background refresh started")
 

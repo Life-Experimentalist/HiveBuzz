@@ -1701,7 +1701,7 @@ class HiveAPI:
 
             return comments
         except Exception as e:
-            self.logger.error(f"Error fetching comments for {author}/{permlink}: {e}")
+            logger.error(f"Error fetching comments for {author}/{permlink}: {e}")
             return []
 
     def _format_comment(self, comment_data):

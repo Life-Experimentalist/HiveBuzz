@@ -1,14 +1,13 @@
+import atexit
 import logging
 import os
-import random
-
-# Import threading module
-import threading
 import time
 from datetime import UTC, datetime
 from functools import wraps
-from typing import Union
+import bleach
 
+# Add imports for markdown processing
+import markdown
 from dotenv import load_dotenv
 from flask import (
     Blueprint,
@@ -22,6 +21,7 @@ from flask import (
     session,
     url_for,
 )
+from markupsafe import Markup
 from slugify import slugify as slugify_function  # Make sure to install python-slugify
 
 import database as db  # Import our database module
@@ -39,10 +39,8 @@ from utils.hivesigner import get_hivesigner_client, init_hivesigner
 # Add the new posts cache
 from utils.posts_cache import get_posts_cache, init_posts_cache
 
-# Add imports for markdown processing
-import markdown
-import bleach
-from markupsafe import Markup
+# Register markdown filter using our utility
+from utils.markdown_utils import setup_markdown_filter
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -57,8 +55,6 @@ config = get_config()
 app = Flask(__name__)
 app.config.from_object(config)
 
-# Register markdown filter using our utility
-from utils.markdown_utils import setup_markdown_filter
 
 setup_markdown_filter(app)
 
@@ -95,7 +91,7 @@ auth_manager = AuthManager(app)
 # Initialize HiveSigner with app details from .env
 hivesigner_app_name = app.config["HIVESIGNER_APP_NAME"]
 hivesigner_client_secret = os.getenv("HIVESIGNER_CLIENT_SECRET", "")
-init_hivesigner(client_id=hivesigner_app_name, client_secret=hivesigner_client_secret)
+init_hivesigner(hivesigner_app_name)  # Initialize with the app name as client ID
 
 # Initialize HiveAuth with app details from .env
 init_hiveauth(
@@ -105,16 +101,15 @@ init_hiveauth(
 )
 
 # Initialize PostsCache with a 5-minute refresh interval (300 seconds)
-# We start the cache immediately for faster loading
 posts_cache = init_posts_cache(refresh_interval=300)
 
-# Wait for priority feeds to load (with a short timeout)
-logger.info("Waiting for initial post data to load...")
-priority_feeds_loaded = posts_cache.wait_for_initialization(timeout=5.0)
-if priority_feeds_loaded:
-    logger.info("Priority feeds loaded successfully")
-else:
-    logger.warning("Priority feeds loading timeout - continuing startup")
+# Remove or comment out blocking wait:
+logger.info("Starting HiveBuzz without waiting for cached posts to load")
+# priority_feeds_loaded = posts_cache.wait_for_initialization(timeout=5.0)
+# if priority_feeds_loaded:
+#     logger.info("Priority feeds loaded successfully")
+# else:
+#     logger.warning("Priority feeds loading timeout - continuing startup")
 
 
 # Initialize HiveAPI on first access, not at startup
@@ -264,8 +259,7 @@ def index():
                         # Convert datetime to string
                         post["created"] = post["created"].strftime("%Y-%m-%d")
                     else:
-                        # Fallback to generic "Recent"
-                        post["created"] = "Recent"
+                        post["created"] = "Recent"  # Add default when format is unknown
 
                 # Ensure other required fields have defaults
                 post["comment_count"] = post.get("comment_count", 0)
@@ -472,66 +466,29 @@ def login_hiveauth():
     uuid = request.form.get("uuid")
 
     if not all([username, auth_token, uuid]):
-        flash("Missing required authentication parameters", "danger")
+        flash("Missing authentication details. Please try again.", "danger")
         return redirect(url_for("login"))
 
-    # In a real implementation, you would verify with HiveAuth API
-    # For example:
-    # verification = verify_hiveauth(username, auth_token, uuid)
-    # if not verification.success:
-    #     flash("HiveAuth verification failed: " + verification.message, "danger")
-    #     return redirect(url_for("login"))
+    # Verify HiveAuth credentials (implement verify_hiveauth in utils/hiveauth.py)
+    from utils.hiveauth import verify_hiveauth
 
-    # For this demo, we'll accept the authentication
-    user_id = db.create_or_update_user(username, "hiveauth")
-
-    if user_id:
-        # Create a new session
-        session_data = session_manager.create_session(
-            username=username,
-            auth_method="hiveauth",
-            additional_data={"token": auth_token, "uuid": uuid},
+    verification = verify_hiveauth(username, auth_token, uuid)
+    if not verification.get("success"):
+        flash(
+            "Authentication failed. Please try again or use another login method.",
+            "danger",
         )
+        return redirect(url_for("login"))
 
-        if session_data:
-            # Set session data
-            session["username"] = username
-            session["auth_method"] = "hiveauth"
-            session["session_id"] = session_data["session_id"]
-
-            # Load user preferences
-            user_data = db.get_user(username)
-            if user_data:
-                if user_data.get("dark_mode") is not None:
-                    session["dark_mode"] = bool(user_data.get("dark_mode"))
-                if user_data.get("theme_color") is not None:
-                    session["theme_color"] = user_data.get("theme_color")
-                if (
-                    user_data.get("custom_color") is not None
-                    and user_data.get("theme_color") == "custom"
-                ):
-                    session["custom_color"] = user_data.get("custom_color")
-                    session["custom_color_light"] = user_data.get("custom_color_light")
-                    session["custom_color_dark"] = user_data.get("custom_color_dark")
-
-            # Log activity
-            db.log_user_activity(
-                username, "auth", {"action": "login", "method": "hiveauth"}
-            )
-
-            flash(f"Welcome, {username}! Authenticated with HiveAuth", "success")
-
-            # Get next URL from query parameter or default to dashboard
-            next_url = request.args.get("next")
-            if next_url and next_url.startswith("/") and not next_url.startswith("//"):
-                return redirect(next_url)
-            return redirect(url_for("index"))
-        else:
-            flash("Failed to create user session.", "error")
+    # For this demo, create or update the user in the database
+    user_id = db.create_or_update_user(username, "hiveauth")
+    if user_id:
+        session["username"] = username
+        flash("Login successful.", "success")
+        return redirect(url_for("index"))
     else:
-        flash("Failed to create or update user.", "error")
-
-    return redirect(url_for("login"))
+        flash("User login failed. Please try again.", "danger")
+        return redirect(url_for("login"))
 
 
 @app.route("/api/check-hiveauth", methods=["GET"])
@@ -1703,8 +1660,6 @@ def cleanup_on_exit():
     logger.info("Application shutdown complete")
 
 
-import atexit
-
 atexit.register(cleanup_on_exit)
 
 if __name__ == "__main__":
@@ -1717,8 +1672,9 @@ if __name__ == "__main__":
     # Add waitress server for production use
     if not debug:
         try:
-            from waitress import serve
             import logging.handlers
+
+            from waitress import serve
 
             # Configure a callback to log when server is ready
             class ServerReadyHandler(logging.Handler):
@@ -1744,7 +1700,7 @@ if __name__ == "__main__":
         # For development, use the Flask built-in server
         logger.info(f"Starting HiveBuzz development server on port {port}")
         logger.info(
-            f"✅ HiveBuzz development server will be available at http://127.0.0.1:{port}"
+            f"✅✅ HiveBuzz development server will be available at http://127.0.0.1:{port}"
         )
         app.run(host="0.0.0.0", port=port, debug=debug, threaded=True)
 

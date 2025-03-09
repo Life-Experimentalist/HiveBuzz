@@ -1,421 +1,132 @@
-{% extends 'base.html' %}
-
-{% block title %}{{ post.title }} - HiveBuzz{% endblock %}
-
-{% block content %}
+{% extends 'base.html' %} {% block title %}{{ post.title }} - HiveBuzz{%
+endblock %} {% block content %}
 <div class="container py-4">
-    <div class="post-container">
-        <!-- Post Header -->
-        <div class="post-header mb-4">
-            <h1 class="display-5 mb-3">{{ post.title }}</h1>
-            <div class="d-flex align-items-center mb-3">
-                <a href="{{ url_for('profile', username=post.author) }}" class="author-link d-flex align-items-center text-decoration-none me-3">
-                    <img src="https://images.hive.blog/u/{{ post.author }}/avatar" alt="{{ post.author }}" class="avatar-sm me-2">
-                    <span class="fw-bold">@{{ post.author }}</span>
-                </a>
-                <span class="text-muted">
-                    {% if post.created is string %}
-                        {{ post.created[:10] }}
-                    {% else %}
-                        {{ post.created.strftime('%Y-%m-%d') if post.created else 'Recent' }}
-                    {% endif %}
-                </span>
+	<div class="post-container">
+		<!-- Post Header -->
+		<div class="post-header mb-4">
+			<h1 class="display-5 mb-3">{{ post.title }}</h1>
+			<div class="d-flex align-items-center mb-3">
+				<a
+					href="{{ url_for('profile', username=post.author) }}"
+					class="author-link d-flex align-items-center text-decoration-none me-3"
+				>
+					<img
+						src="https://images.hive.blog/u/{{ post.author }}/avatar"
+						alt="{{ post.author }}"
+						class="avatar-sm me-2"
+					/>
+					<span class="fw-bold">@{{ post.author }}</span>
+				</a>
+				<span class="text-muted">
+					{% if post.created is string %} {{ post.created[:10] }} {%
+					else %} {{ post.created.strftime('%Y-%m-%d') if post.created
+					else 'Recent' }} {% endif %}
+				</span>
 
-                {% if post.is_demo %}
-                <span class="badge bg-info ms-2">Demo Post</span>
-                {% endif %}
-            </div>
+				{% if post.is_demo %}
+				<span class="badge bg-info ms-2">Demo Post</span>
+				{% endif %}
+			</div>
 
-            <!-- Post Tags -->
-            {% if post.tags %}
-            <div class="post-tags mb-3">
-                {% for tag in post.tags %}
-                <a href="{{ url_for('posts', feed='trending', tag=tag) }}" class="badge bg-light text-dark me-1">
-                    #{{ tag }}
-                </a>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
+			<div class="post-content">{{ post.body | safe }}</div>
 
-        <!-- Post Content -->
-        <div class="post-content mb-4">
-            <div class="card">
-                <div class="card-body">
-                    <!-- Main Post Image (if available) -->
-                    {% if post.image %}
-                    <div class="post-main-image mb-4">
-                        <img src="{{ post.image }}" alt="Post image" class="img-fluid rounded">
-                    </div>
-                    {% endif %}
+			{% if post.tags %}
+			<div class="post-tags">
+				{% for tag in post.tags %}
+				<span class="tag">{{ tag }}</span>
+				{% endfor %}
+			</div>
+			{% endif %}
 
-                    <!-- Post Body Content -->
-                    <div class="post-body markdown-content">
-                        {{ post.body|safe }}
-                    </div>
-                </div>
-            </div>
-        </div>
+			<div class="post-actions">
+				<button class="upvote-btn" id="upvote-post">👍 Upvote</button>
+				<button class="reblog-btn" id="reblog-post">🔄 Reblog</button>
+				<button class="comment-btn" id="add-comment">💬 Comment</button>
+			</div>
+		</div>
 
-        <!-- Post Stats -->
-        <div class="post-stats card mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div class="d-flex align-items-center">
-                        <!-- Vote Button -->
-                        {% if session.get('username') and session.get('username') != post.author and not post.is_demo %}
-                        <button class="btn btn-outline-primary me-3" id="voteBtn" data-author="{{ post.author }}" data-permlink="{{ post.permlink }}">
-                            <i class="bi bi-hand-thumbs-up me-1"></i>
-                            <span id="voteCount">{{ post.vote_count }}</span>
-                        </button>
-                        {% else %}
-                        <div class="me-3">
-                            <i class="bi bi-hand-thumbs-up me-1"></i>
-                            <span>{{ post.vote_count }}</span>
-                        </div>
-                        {% endif %}
+		<div class="post-comments">
+			<h3>Comments</h3>
+			<div id="comment-form-container" style="display: none">
+				<form id="comment-form" class="comment-form">
+					<textarea
+						id="comment-text"
+						rows="3"
+						placeholder="Write your comment here..."
+					></textarea>
+					<button type="button" id="submit-comment" class="btn">
+						Post Comment
+					</button>
+					<button
+						type="button"
+						id="cancel-comment"
+						class="btn btn-secondary"
+					>
+						Cancel
+					</button>
+				</form>
+			</div>
+			<div id="comments-list">
+				<p class="placeholder-text">
+					No comments yet. Be the first to comment!
+				</p>
+			</div>
+		</div>
+	</div>
+	{% endblock %} {% block scripts %}
+	<script>
+		document.addEventListener("DOMContentLoaded", function () {
+			// Toggle comment form
+			const addCommentBtn = document.getElementById("add-comment");
+			const commentFormContainer = document.getElementById(
+				"comment-form-container"
+			);
+			const cancelCommentBtn = document.getElementById("cancel-comment");
 
-                        <!-- Comments Count -->
-                        <div class="me-3">
-                            <i class="bi bi-chat-dots me-1"></i>
-                            <span>{{ post.comment_count }}</span>
-                        </div>
-                    </div>
+			if (addCommentBtn && commentFormContainer) {
+				addCommentBtn.addEventListener("click", function () {
+					commentFormContainer.style.display = "block";
+				});
+			}
 
-                    <!-- Payout Value -->
-                    <div class="payout">
-                        <span class="text-success fw-bold">{{ post.payout }}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
+			if (cancelCommentBtn) {
+				cancelCommentBtn.addEventListener("click", function () {
+					commentFormContainer.style.display = "none";
+				});
+			}
 
-        <!-- Comments Section -->
-        <div class="comments-section">
-            <h3 class="mb-3">Comments</h3>
+			// Upvote functionality (demo only)
+			const upvoteBtn = document.getElementById("upvote-post");
+			if (upvoteBtn) {
+				upvoteBtn.addEventListener("click", function () {
+					if (window.hive_keychain) {
+						alert(
+							"In a real implementation, this would broadcast an upvote to the Hive blockchain."
+						);
+					} else {
+						alert(
+							"Hive Keychain extension is required for upvoting."
+						);
+					}
+				});
+			}
 
-            <!-- Comment Form -->
-            {% if session.get('username') %}
-            <div class="card mb-4">
-                <div class="card-body">
-                    <form method="POST" action="{{ url_for('add_comment', author=post.author, permlink=post.permlink) }}" class="comment-form">
-                        <div class="mb-3">
-                            <label for="comment_body" class="form-label">Add a comment</label>
-                            <textarea class="form-control" id="comment_body" name="comment_body" rows="3" required></textarea>
-                        </div>
-
-                        {% if session.get('auth_method') == 'demo' %}
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="demo_comment" name="demo_comment" checked disabled>
-                            <label class="form-check-label" for="demo_comment">
-                                Create as demo comment (does not publish to blockchain)
-                            </label>
-                        </div>
-                        {% endif %}
-
-                        <button type="submit" class="btn btn-primary">Submit Comment</button>
-                    </form>
-                </div>
-            </div>
-            {% else %}
-            <div class="alert alert-info mb-4">
-                <i class="bi bi-info-circle me-2"></i>
-                Please <a href="{{ url_for('login') }}" class="alert-link">log in</a> to leave a comment.
-            </div>
-            {% endif %}
-
-            <!-- Comments List -->
-            <div class="comments-list">
-                {% if comments and comments|length > 0 %}
-                    {% for comment in comments %}
-                    <div class="card mb-3 comment">
-                        <div class="card-body">
-                            <div class="d-flex mb-2">
-                                <a href="{{ url_for('profile', username=comment.author) }}" class="author-link d-flex align-items-center text-decoration-none me-auto">
-                                    <img src="https://images.hive.blog/u/{{ comment.author }}/avatar" alt="{{ comment.author }}" class="avatar-xs me-2">
-                                    <span class="fw-bold">@{{ comment.author }}</span>
-                                </a>
-                                <small class="text-muted">
-                                    {% if comment.created is string %}
-                                        {{ comment.created[:10] }}
-                                    {% else %}
-                                        {{ comment.created.strftime('%Y-%m-%d') if comment.created else 'Recent' }}
-                                    {% endif %}
-                                </small>
-
-                                {% if comment.is_demo %}
-                                <span class="badge bg-info ms-2">Demo</span>
-                                {% endif %}
-                            </div>
-                            <div class="comment-body markdown-content">
-                                {{ comment.body|safe }}
-                            </div>
-                            <div class="comment-actions mt-2">
-                                {% if session.get('username') %}
-                                <button class="btn btn-sm btn-outline-primary reply-btn" data-comment-author="{{ comment.author }}" data-comment-permlink="{{ comment.permlink }}">
-                                    <i class="bi bi-reply"></i> Reply
-                                </button>
-                                {% endif %}
-                                <span class="ms-2">
-                                    <i class="bi bi-hand-thumbs-up"></i>
-                                    <small>{{ comment.net_votes|default(0) }}</small>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                <div class="text-center py-5 text-muted">
-                    <i class="bi bi-chat-dots-fill fs-1"></i>
-                    <p class="mt-2">No comments yet. Be the first to comment!</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+			// Reblog functionality (demo only)
+			const reblogBtn = document.getElementById("reblog-post");
+			if (reblogBtn) {
+				reblogBtn.addEventListener("click", function () {
+					if (window.hive_keychain) {
+						alert(
+							"In a real implementation, this would broadcast a reblog operation to the Hive blockchain."
+						);
+					} else {
+						alert(
+							"Hive Keychain extension is required for reblogging."
+						);
+					}
+				});
+			}
+		});
+	</script>
+	{% endblock %}
 </div>
-{% endblock %}
-
-{% block styles %}
-<style>
-    .post-container {
-        max-width: 900px;
-        margin: 0 auto;
-    }
-
-    .post-header {
-        border-bottom: 1px solid rgba(0,0,0,0.1);
-        padding-bottom: 1rem;
-    }
-
-    body.dark-mode .post-header {
-        border-bottom-color: rgba(255,255,255,0.1);
-    }
-
-    .avatar-sm {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        object-fit: cover;
-    }
-
-    .avatar-xs {
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        object-fit: cover;
-    }
-
-    .post-main-image img {
-        max-height: 400px;
-        object-fit: contain;
-        width: 100%;
-    }
-
-    .post-body {
-        font-size: 1.1rem;
-        line-height: 1.6;
-    }
-
-    .post-body img {
-        max-width: 100%;
-        height: auto;
-    }
-
-    .comment {
-        border-left: 3px solid var(--accent-primary);
-        transition: transform 0.2s;
-    }
-
-    .comment:hover {
-        transform: translateX(5px);
-    }
-
-    .markdown-content img {
-        max-width: 100%;
-        height: auto;
-    }
-
-    .markdown-content h1, .markdown-content h2, .markdown-content h3,
-    .markdown-content h4, .markdown-content h5, .markdown-content h6 {
-        margin-top: 1.5rem;
-        margin-bottom: 0.75rem;
-    }
-
-    .markdown-content a {
-        color: var(--accent-primary);
-        text-decoration: none;
-    }
-
-    .markdown-content a:hover {
-        text-decoration: underline;
-    }
-
-    .markdown-content blockquote {
-        padding: 0.5rem 1rem;
-        border-left: 4px solid var(--accent-primary);
-        background-color: rgba(0,0,0,0.03);
-        margin: 1rem 0;
-    }
-
-    body.dark-mode .markdown-content blockquote {
-        background-color: rgba(255,255,255,0.05);
-    }
-
-    .markdown-content pre {
-        background-color: #f5f5f5;
-        padding: 1rem;
-        border-radius: 4px;
-        overflow-x: auto;
-    }
-
-    body.dark-mode .markdown-content pre {
-        background-color: #2d3748;
-    }
-
-    .markdown-content table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 1rem 0;
-    }
-
-    .markdown-content table th,
-    .markdown-content table td {
-        padding: 0.5rem;
-        border: 1px solid #ddd;
-    }
-
-    body.dark-mode .markdown-content table th,
-    body.dark-mode .markdown-content table td {
-        border-color: #4a5568;
-    }
-</style>
-{% endblock %}
-
-{% block scripts %}
-<script src="{{ url_for('static', filename='js/hive-keychain.js') }}"></script>
-<script></script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Vote functionality for authenticated users
-    const voteBtn = document.getElementById('voteBtn');
-    if (voteBtn) {
-        voteBtn.addEventListener('click', async function() {
-            const author = this.getAttribute('data-author');
-            const permlink = this.getAttribute('data-permlink');
-            const username = "{{ session.get('username') }}";
-
-            // Check if Hive Keychain is available
-            if (typeof window.hive_keychain === 'undefined') {
-                alert('Hive Keychain extension is required for voting. Please install it and try again.');
-                return;
-            }
-
-            // Show loading state
-            voteBtn.disabled = true;
-            const originalHTML = voteBtn.innerHTML;
-            voteBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
-
-            try {
-                // Default to 100% upvote
-                const weight = 10000;
-
-                window.hive_keychain.requestVote(
-                    username,
-                    permlink,
-                    author,
-                    weight,
-                    function(response) {
-                        if (response.success) {
-                            // Update vote count
-                            const voteCount = document.getElementById('voteCount');
-                            if (voteCount) {
-                                voteCount.textContent = parseInt(voteCount.textContent) + 1;
-                            }
-
-                            // Change button appearance
-                            voteBtn.classList.remove('btn-outline-primary');
-                            voteBtn.classList.add('btn-primary');
-
-                            // Show success message
-                            showNotification('Your vote has been recorded!', 'success');
-                        } else {
-                            // Show error message
-                            showNotification('Vote failed: ' + response.message, 'danger');
-                        }
-
-                        // Restore button state
-                        voteBtn.innerHTML = originalHTML;
-                        voteBtn.disabled = false;
-                    }
-                );
-            } catch (error) {
-                showNotification('Error: ' + error.message, 'danger');
-                voteBtn.innerHTML = originalHTML;
-                voteBtn.disabled = false;
-            }
-        });
-    }
-
-    // Reply buttons for comments
-    const replyBtns = document.querySelectorAll('.reply-btn');
-    replyBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const commentAuthor = this.getAttribute('data-comment-author');
-            const commentPermlink = this.getAttribute('data-comment-permlink');
-
-            // Fill the comment textarea with a mention
-            const commentBody = document.getElementById('comment_body');
-            if (commentBody) {
-                commentBody.value = `@${commentAuthor} `;
-                commentBody.focus();
-
-                // Scroll to the comment form
-                commentBody.scrollIntoView({ behavior: 'smooth' });
-            }
-        });
-    });
-
-    // Helper function to show notifications
-    function showNotification(message, type = 'info') {
-        // Create toast container if it doesn't exist
-        let toastContainer = document.querySelector('.toast-container');
-        if (!toastContainer) {
-            toastContainer = document.createElement('div');
-            toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-            document.body.appendChild(toastContainer);
-        }
-
-        // Create toast element
-        const toastId = 'toast-' + Date.now();
-        const toast = document.createElement('div');
-        toast.className = `toast align-items-center text-white bg-${type} border-0`;
-        toast.setAttribute('role', 'alert');
-        toast.setAttribute('aria-live', 'assertive');
-        toast.setAttribute('aria-atomic', 'true');
-        toast.setAttribute('id', toastId);
-
-        // Toast content
-        toast.innerHTML = `
-            <div class="d-flex">
-                <div class="toast-body">
-                    ${message}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-        `;
-
-        // Add toast to container
-        toastContainer.appendChild(toast);
-
-        // Initialize and show the toast
-        const bsToast = new bootstrap.Toast(toast);
-        bsToast.show();
-
-        // Remove toast after it's hidden
-        toast.addEventListener('hidden.bs.toast', function () {
-            toast.remove();
-        });
-    }
-});
-</script>
-{% endblock %}

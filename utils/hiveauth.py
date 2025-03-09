@@ -146,6 +146,15 @@ class HiveAuthVerifier:
             return False, None
 
 
+def verify_hiveauth(username, auth_token, uuid):
+    """
+    Simulated verification for HiveAuth.
+    In a real implementation you would call HiveAuth API.
+    """
+    # For demonstration, always return success
+    return {"success": True}
+
+
 # Create a global instance for app-wide use
 hiveauth_verifier = None
 
