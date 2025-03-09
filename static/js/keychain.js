@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", function () {
 	// Function to check if Hive Keychain is installed
 	function checkForKeychain() {
 		const keychainInstalled = window.hive_keychain || false;
-		const keychainNoticeDiv = document.getElementById("keychain-notice");
+		const keychainNoticeDiv = document.getElementById("keychain-status");
 		const keychainLoginBtn = document.getElementById("keychain-login-btn");
 
 		console.log(
@@ -12,14 +12,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		if (!keychainInstalled) {
 			if (keychainNoticeDiv) {
-				keychainNoticeDiv.style.display = "block";
+				keychainNoticeDiv.innerHTML =
+					"<strong>Hive Keychain not detected!</strong> Please install the <a href='https://chrome.google.com/webstore/detail/hive-keychain/jcacnejopjdphbnjgfaaobbfafkihpep' target='_blank'>Hive Keychain browser extension</a> to continue.";
+				keychainNoticeDiv.classList.remove("alert-info");
+				keychainNoticeDiv.classList.add("alert-danger");
 			}
 			if (keychainLoginBtn) {
 				keychainLoginBtn.disabled = true;
 			}
 		} else {
 			if (keychainNoticeDiv) {
-				keychainNoticeDiv.style.display = "none";
+				keychainNoticeDiv.textContent = "Hive Keychain detected!";
+				keychainNoticeDiv.classList.remove("alert-info");
+				keychainNoticeDiv.classList.add("alert-success");
 			}
 			if (keychainLoginBtn) {
 				keychainLoginBtn.disabled = false;
@@ -43,7 +48,8 @@ document.addEventListener("DOMContentLoaded", function () {
 		);
 
 		// Generate a random string as challenge for the signature
-		const challenge = Math.random().toString(36).substring(2);
+		const challenge =
+			"hivebuzz-auth-" + Math.random().toString(36).substring(2, 15);
 
 		// Request signature from Hive Keychain
 		if (window.hive_keychain) {
@@ -55,37 +61,14 @@ document.addEventListener("DOMContentLoaded", function () {
 					console.log("Keychain response:", response);
 
 					if (response.success) {
-						// Create a form to submit the data to server
-						const form = document.createElement("form");
-						form.method = "POST";
-						form.action = "/login";
-
-						// Add username
-						const usernameInput = document.createElement("input");
-						usernameInput.type = "hidden";
-						usernameInput.name = "username";
-						usernameInput.value = username;
-
-						// Add signature
-						const signatureInput = document.createElement("input");
-						signatureInput.type = "hidden";
-						signatureInput.name = "signature";
-						signatureInput.value = response.result;
-
-						// Add challenge
-						const challengeInput = document.createElement("input");
-						challengeInput.type = "hidden";
-						challengeInput.name = "challenge";
-						challengeInput.value = challenge;
-
-						// Append inputs to form
-						form.appendChild(usernameInput);
-						form.appendChild(signatureInput);
-						form.appendChild(challengeInput);
-
-						// Append form to body and submit
-						document.body.appendChild(form);
-						form.submit();
+						// Populate and submit the form
+						document.getElementById("keychain_username").value =
+							username;
+						document.getElementById("keychain_signature").value =
+							response.result;
+						document.getElementById("keychain_challenge").value =
+							challenge;
+						document.getElementById("keychainLoginForm").submit();
 					} else {
 						alert(
 							`Error: ${
@@ -97,9 +80,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 			);
 		} else {
-			alert(
-				"Hive Keychain not found. Please install the extension first."
-			);
+			alert("Hive Keychain extension is required for this login method.");
 		}
 	}
 

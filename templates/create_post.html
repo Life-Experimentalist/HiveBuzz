@@ -1,126 +1,280 @@
-{% extends 'base.html' %} {% block title %}Create Post - HiveBuzz{% endblock %}
+{% extends 'base.html' %}
+{% block title %}Create Post - HiveBuzz{% endblock %}
+
 {% block content %}
-<div class="create-post-container">
-	<h2>Create New Post</h2>
+<div class="container">
+    <div class="create-post-container">
+        <h1 class="mb-4">Create New Post</h1>
+        <p class="text-muted mb-4">Share your thoughts with the Hive community</p>
 
-	<form
-		action="{{ url_for('create_post') }}"
-		method="post"
-		class="post-form"
-		id="post-form"
-	>
-		<div class="form-group">
-			<label for="title">Title</label>
-			<input
-				type="text"
-				id="title"
-				name="title"
-				placeholder="Enter post title"
-				required
-			/>
-		</div>
+        <form method="POST" id="create-post-form">
+            <div class="mb-4">
+                <label for="title" class="form-label">Title</label>
+                <input
+                    type="text"
+                    class="form-control"
+                    id="title"
+                    name="title"
+                    required
+                    maxlength="255"
+                    placeholder="Enter a descriptive title"
+                >
+            </div>
 
-		<div class="form-group">
-			<label for="body">Content</label>
-			<textarea
-				id="body"
-				name="body"
-				rows="10"
-				placeholder="Write your post content here..."
-				required
-			></textarea>
-		</div>
+            <div class="mb-4">
+                <label for="body" class="form-label">Content</label>
+                <div class="editor-toolbar mb-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-format="bold">Bold</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-format="italic">Italic</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-format="heading">Heading</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-format="link">Link</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-format="image">Image</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-format="list">List</button>
+                </div>
+                <textarea
+                    class="form-control"
+                    id="body"
+                    name="body"
+                    rows="12"
+                    required
+                    placeholder="Write your post content here..."
+                ></textarea>
+                <div class="form-text">Markdown is supported for formatting.</div>
+            </div>
 
-		<div class="form-group">
-			<label for="tags">Tags (comma separated)</label>
-			<input
-				type="text"
-				id="tags"
-				name="tags"
-				placeholder="hive,dbuzz,crypto,blog"
-			/>
-		</div>
+            <div class="mb-4">
+                <label for="tags" class="form-label">Tags</label>
+                <input
+                    type="text"
+                    class="form-control"
+                    id="tags"
+                    name="tags"
+                    placeholder="Enter tags separated by commas (e.g., hive, blockchain, crypto)"
+                >
+                <div class="form-text">Add up to 10 tags to help categorize your post.</div>
+            </div>
 
-		<input
-			type="hidden"
-			name="author-username"
-			id="author-username"
-			value="{{ session.username }}"
-		/>
+            <div class="mb-4">
+                <label class="form-label">Preview</label>
+                <div id="preview" class="preview-container p-3 border rounded">
+                    <p class="text-muted text-center">Your post preview will appear here.</p>
+                </div>
+            </div>
 
-		<div class="form-actions">
-			<button type="button" id="preview-btn" class="btn btn-secondary">
-				Preview
-			</button>
-			<button type="submit" id="publish-btn" class="btn">
-				Publish Post
-			</button>
-		</div>
-	</form>
+            <div class="d-flex justify-content-between mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="draft" name="draft">
+                    <label class="form-check-label" for="draft">
+                        Save as draft
+                    </label>
+                </div>
+                <button type="button" id="preview-btn" class="btn btn-secondary">Preview</button>
+            </div>
 
-	<div id="post-preview" style="display: none">
-		<h3>Post Preview</h3>
-		<div class="post-preview">
-			<h1 id="preview-title"></h1>
-			<div class="post-meta">
-				<span class="post-author">@{{ session.username }}</span>
-				<span class="post-date">Just now</span>
-			</div>
-			<div class="post-content" id="preview-content"></div>
-			<div class="post-tags" id="preview-tags"></div>
-		</div>
-		<button type="button" id="edit-btn" class="btn btn-secondary">
-			Edit
-		</button>
-	</div>
+            <div class="d-grid mt-4">
+                <button type="submit" class="btn btn-primary btn-lg">Publish Post</button>
+            </div>
+
+            <div class="mt-3 text-muted">
+                <small><i class="bi bi-info-circle"></i> Publishing will use your posting key through Hive Keychain.</small>
+            </div>
+        </form>
+    </div>
 </div>
-{% endblock %} {% block scripts %}
+{% endblock %}
+
+{% block styles %}
+<style>
+    .create-post-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    .editor-toolbar {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .preview-container {
+        min-height: 200px;
+        max-height: 400px;
+        overflow-y: auto;
+        background-color: #f9f9f9;
+    }
+
+    body.dark-mode .preview-container {
+        background-color: #333;
+    }
+
+    .tag-badge {
+        margin-right: 5px;
+        margin-bottom: 5px;
+        display: inline-block;
+        padding: 5px 10px;
+        background: #f0f0f0;
+        border-radius: 20px;
+        font-size: 14px;
+    }
+
+    body.dark-mode .tag-badge {
+        background-color: #444;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
 <script>
-	document.addEventListener("DOMContentLoaded", function () {
-		const postForm = document.getElementById("post-form");
-		const previewBtn = document.getElementById("preview-btn");
-		const editBtn = document.getElementById("edit-btn");
-		const previewSection = document.getElementById("post-preview");
+    document.addEventListener('DOMContentLoaded', function() {
+        const titleInput = document.getElementById('title');
+        const bodyInput = document.getElementById('body');
+        const tagsInput = document.getElementById('tags');
+        const previewBtn = document.getElementById('preview-btn');
+        const previewContainer = document.getElementById('preview');
+        const form = document.getElementById('create-post-form');
 
-		// Preview functionality
-		if (previewBtn) {
-			previewBtn.addEventListener("click", function () {
-				const title = document.getElementById("title").value;
-				const body = document.getElementById("body").value;
-				const tags = document.getElementById("tags").value;
+        // Simple markdown parser for preview
+        function parseMarkdown(text) {
+            // This is a very simple implementation, you would want a real Markdown parser in production
+            let html = text
+                // Bold
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                // Italic
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                // Headers
+                .replace(/^# (.*?)$/gm, '<h1>$1</h1>')
+                .replace(/^## (.*?)$/gm, '<h2>$1</h2>')
+                .replace(/^### (.*?)$/gm, '<h3>$1</h3>')
+                // Links
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+                // Images
+                .replace(/!\[([^\]]+)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="img-fluid">')
+                // Lists
+                .replace(/^\- (.*?)$/gm, '<li>$1</li>');
 
-				if (!title || !body) {
-					alert("Title and content are required for preview.");
-					return;
-				}
+            // Replace line breaks with <br>
+            html = html.replace(/\n/g, '<br>');
 
-				// Display the preview
-				document.getElementById("preview-title").textContent = title;
-				document.getElementById("preview-content").innerHTML =
-					body.replace(/\n/g, "<br>");
+            // Wrap lists
+            html = html.replace(/(<li>.*?<\/li>)+/g, function(match) {
+                return '<ul>' + match + '</ul>';
+            });
 
-				// Process tags
-				const tagElements = tags
-					.split(",")
-					.map((tag) => tag.trim())
-					.filter((tag) => tag)
-					.map((tag) => `<span class="tag">${tag}</span>`)
-					.join("");
-				document.getElementById("preview-tags").innerHTML = tagElements;
+            return html;
+        }
 
-				// Show preview, hide form
-				previewSection.style.display = "block";
-				postForm.style.display = "none";
-			});
-		}
+        // Generate preview
+        previewBtn.addEventListener('click', function() {
+            const title = titleInput.value.trim();
+            const body = bodyInput.value.trim();
+            const tags = tagsInput.value.trim();
 
-		// Return to editing
-		if (editBtn) {
-			editBtn.addEventListener("click", function () {
-				previewSection.style.display = "none";
-				postForm.style.display = "block";
-			});
-		}
-	});
+            if (!title && !body) {
+                previewContainer.innerHTML = '<p class="text-muted text-center">Add content to see a preview.</p>';
+                return;
+            }
+
+            let preview = '';
+            if (title) {
+                preview += `<h1>${title}</h1>`;
+            }
+            if (body) {
+                preview += `<div class="post-content">${parseMarkdown(body)}</div>`;
+            }
+            if (tags) {
+                preview += '<div class="post-tags mt-3">';
+                const tagArray = tags.split(',').map(tag => tag.trim()).filter(Boolean);
+                tagArray.forEach(tag => {
+                    preview += `<span class="tag-badge">${tag}</span>`;
+                });
+                preview += '</div>';
+            }
+
+            previewContainer.innerHTML = preview;
+        });
+
+        // Format buttons
+        document.querySelectorAll('.editor-toolbar button').forEach(button => {
+            button.addEventListener('click', function() {
+                const format = this.getAttribute('data-format');
+                const textarea = bodyInput;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const selectedText = textarea.value.substring(start, end);
+                let replacement;
+
+                switch (format) {
+                    case 'bold':
+                        replacement = `**${selectedText}**`;
+                        break;
+                    case 'italic':
+                        replacement = `*${selectedText}*`;
+                        break;
+                    case 'heading':
+                        replacement = `\n# ${selectedText}\n`;
+                        break;
+                    case 'link':
+                        if (selectedText) {
+                            replacement = `[${selectedText}](url)`;
+                        } else {
+                            replacement = `[Link text](url)`;
+                        }
+                        break;
+                    case 'image':
+                        replacement = `![Image description](image_url)`;
+                        break;
+                    case 'list':
+                        if (selectedText) {
+                            // Split the selected text by lines and prepend each with a dash
+                            const lines = selectedText.split('\n');
+                            replacement = lines.map(line => `- ${line}`).join('\n');
+                        } else {
+                            replacement = `- List item`;
+                        }
+                        break;
+                    default:
+                        replacement = selectedText;
+                }
+
+                // Insert the replacement
+                textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+
+                // Set the cursor position after the replacement
+                textarea.focus();
+                textarea.selectionStart = start + replacement.length;
+                textarea.selectionEnd = start + replacement.length;
+            });
+        });
+
+        // Form submission
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const title = titleInput.value.trim();
+            const body = bodyInput.value.trim();
+
+            if (!title) {
+                alert('Please enter a title for your post.');
+                return;
+            }
+
+            if (!body) {
+                alert('Please enter content for your post.');
+                return;
+            }
+
+            // Check if Hive Keychain is available
+            if (window.hive_keychain) {
+                const username = '{{ session.get('username', '') }}';
+
+                // For demo purposes, we'll just submit the form
+                // In a real app, you would first sign with Hive Keychain
+                form.submit();
+            } else {
+                alert('Hive Keychain extension is required for posting.');
+            }
+        });
+    });
 </script>
 {% endblock %}

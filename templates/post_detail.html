@@ -1,115 +1,379 @@
-{% extends 'base.html' %} {% block title %}{{ post.title }} - HiveBuzz{%
-endblock %} {% block content %}
-<div class="post-detail-container">
-	<div class="post-detail">
-		<h1 class="post-title">{{ post.title }}</h1>
+{% extends 'base.html' %}
+{% block title %}{{ post.title }} - HiveBuzz{% endblock %}
 
-		<div class="post-meta">
-			<a
-				href="{{ url_for('profile', username=post.author) }}"
-				class="post-author"
-			>
-				<span>@{{ post.author }}</span>
-			</a>
-			<span class="post-date">{{ post.created }}</span>
-		</div>
+{% block content %}
+<div class="container">
+    <div class="post-detail-container">
+        <!-- Post Header -->
+        <div class="post-header">
+            <h1 class="post-title">{{ post.title }}</h1>
 
-		<div class="post-content">{{ post.body | safe }}</div>
+            <div class="post-meta">
+                <div class="author-info">
+                    <img
+                        src="https://images.hive.blog/u/{{ post.author }}/avatar"
+                        alt="{{ post.author }}"
+                        class="author-avatar"
+                        onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default-avatar.svg') }}';">
+                    <a href="{{ url_for('profile', username=post.author) }}" class="author-name">@{{ post.author }}</a>
+                </div>
 
-		{% if post.tags %}
-		<div class="post-tags">
-			{% for tag in post.tags %}
-			<span class="tag">{{ tag }}</span>
-			{% endfor %}
-		</div>
-		{% endif %}
+                <div class="post-info">
+                    <span class="post-date" title="{{ post.created }}">
+                        <i class="bi bi-calendar3"></i> {{ post.created }}
+                    </span>
 
-		<div class="post-actions">
-			<button class="upvote-btn" id="upvote-post">👍 Upvote</button>
-			<button class="reblog-btn" id="reblog-post">🔄 Reblog</button>
-			<button class="comment-btn" id="add-comment">💬 Comment</button>
-		</div>
-	</div>
+                    {% if post.payout %}
+                    <span class="post-payout" title="Estimated payout value">
+                        <i class="bi bi-cash-coin"></i> ${{ post.payout }}
+                    </span>
+                    {% endif %}
 
-	<div class="post-comments">
-		<h3>Comments</h3>
-		<div id="comment-form-container" style="display: none">
-			<form id="comment-form" class="comment-form">
-				<textarea
-					id="comment-text"
-					rows="3"
-					placeholder="Write your comment here..."
-				></textarea>
-				<button type="button" id="submit-comment" class="btn">
-					Post Comment
-				</button>
-				<button
-					type="button"
-					id="cancel-comment"
-					class="btn btn-secondary"
-				>
-					Cancel
-				</button>
-			</form>
-		</div>
-		<div id="comments-list">
-			<p class="placeholder-text">
-				No comments yet. Be the first to comment!
-			</p>
-		</div>
-	</div>
+                    {% if post.votes %}
+                    <span class="post-votes" title="{{ post.votes|length }} votes">
+                        <i class="bi bi-hand-thumbs-up"></i> {{ post.votes|length }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if post.tags %}
+            <div class="post-tags">
+                {% for tag in post.tags %}
+                <span class="tag">{{ tag }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Post Content -->
+        <div class="post-content">
+            {{ post.body|safe }}
+        </div>
+
+        <!-- Post Actions -->
+        <div class="post-actions">
+            <button class="btn btn-primary upvote-btn" data-author="{{ post.author }}" data-permlink="{{ post.permlink }}">
+                <i class="bi bi-hand-thumbs-up"></i> Upvote
+            </button>
+
+            <button class="btn btn-outline-secondary comment-btn">
+                <i class="bi bi-chat"></i> Comment
+            </button>
+
+            <button class="btn btn-outline-secondary share-btn" data-author="{{ post.author }}" data-permlink="{{ post.permlink }}" data-title="{{ post.title }}">
+                <i class="bi bi-share"></i> Share
+            </button>
+
+            <button class="btn btn-outline-secondary bookmark-btn">
+                <i class="bi bi-bookmark"></i> Bookmark
+            </button>
+        </div>
+
+        <!-- Comments Section -->
+        <div class="comments-section">
+            <h3 class="comments-title">
+                <i class="bi bi-chat-square-text"></i> Comments
+                {% if post.comments %}({{ post.comments|length }}){% endif %}
+            </h3>
+
+            {% if session.get('username') %}
+            <div class="comment-form-container">
+                <form method="POST" action="{{ url_for('add_comment', author=post.author, permlink=post.permlink) }}" class="comment-form">
+                    <div class="form-group">
+                        <textarea class="form-control" name="comment_body" rows="3" placeholder="Write your comment..."></textarea>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary">Submit Comment</button>
+                    </div>
+                </form>
+            </div>
+            {% else %}
+            <div class="login-to-comment">
+                <p><a href="{{ url_for('login') }}">Login</a> to leave a comment.</p>
+            </div>
+            {% endif %}
+
+            {% if post.comments %}
+            <div class="comments-list">
+                {% for comment in post.comments %}
+                <div class="comment">
+                    <div class="comment-header">
+                        <div class="comment-author">
+                            <img
+                                src="https://images.hive.blog/u/{{ comment.author }}/avatar"
+                                alt="{{ comment.author }}"
+                                class="comment-avatar"
+                                onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/default-avatar.svg') }}';">
+                            <a href="{{ url_for('profile', username=comment.author) }}" class="comment-author-name">@{{ comment.author }}</a>
+                        </div>
+                        <span class="comment-date">{{ comment.created }}</span>
+                    </div>
+                    <div class="comment-content">
+                        {{ comment.body|safe }}
+                    </div>
+                    <div class="comment-actions">
+                        <button class="btn btn-sm btn-outline-primary upvote-comment-btn">
+                            <i class="bi bi-hand-thumbs-up"></i> Upvote
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary reply-btn">
+                            <i class="bi bi-reply"></i> Reply
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="no-comments">
+                <div class="empty-state">
+                    <img src="{{ url_for('static', filename='img/illustrations/empty-comments.svg') }}" alt="No comments yet" class="empty-state-img">
+                    <p>No comments yet. Be the first to comment!</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
-{% endblock %} {% block scripts %}
+{% endblock %}
+
+{% block styles %}
+<style>
+    .post-detail-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+
+    .post-header {
+        margin-bottom: 2rem;
+    }
+
+    .post-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        line-height: 1.2;
+    }
+
+    .post-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .author-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .author-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .author-name {
+        font-weight: 500;
+    }
+
+    .post-info {
+        display: flex;
+        gap: 1rem;
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+    }
+
+    .post-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .tag {
+        background-color: var(--bg-hover);
+        color: var(--text-secondary);
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        transition: background-color 0.2s;
+    }
+
+    .tag:hover {
+        background-color: var(--accent-light);
+        color: white;
+    }
+
+    .post-content {
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+    }
+
+    .post-content img {
+        max-width: 100%;
+        height: auto;
+        margin: 1rem 0;
+        border-radius: 8px;
+    }
+
+    .post-actions {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+    }
+
+    .comments-section {
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .comments-title {
+        margin-bottom: 1.5rem;
+    }
+
+    .comment-form-container {
+        margin-bottom: 2rem;
+    }
+
+    .comments-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .comment {
+        background-color: var(--bg-hover);
+        padding: 1rem;
+        border-radius: 8px;
+    }
+
+    .comment-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+
+    .comment-author {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .comment-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+
+    .comment-date {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+
+    .comment-content {
+        font-size: 1rem;
+        line-height: 1.5;
+        margin-bottom: 0.5rem;
+    }
+
+    .comment-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .no-comments {
+        text-align: center;
+        padding: 2rem 0;
+    }
+
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .empty-state-img {
+        max-width: 150px;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
 <script>
-	document.addEventListener("DOMContentLoaded", function () {
-		// Toggle comment form
-		const addCommentBtn = document.getElementById("add-comment");
-		const commentFormContainer = document.getElementById(
-			"comment-form-container"
-		);
-		const cancelCommentBtn = document.getElementById("cancel-comment");
+    document.addEventListener("DOMContentLoaded", function() {
+        // Upvote functionality
+        const upvoteBtn = document.querySelector(".upvote-btn");
+        if (upvoteBtn) {
+            upvoteBtn.addEventListener("click", function() {
+                const author = this.getAttribute("data-author");
+                const permlink = this.getAttribute("data-permlink");
 
-		if (addCommentBtn && commentFormContainer) {
-			addCommentBtn.addEventListener("click", function () {
-				commentFormContainer.style.display = "block";
-			});
-		}
+                // Check if user is logged in
+                {% if session.get('username') %}
+                    // Check if Keychain is available
+                    if (window.HiveKeychainHelper) {
+                        HiveKeychainHelper.requestVote("{{ session.get('username') }}", author, permlink, 10000)
+                            .then(response => {
+                                this.innerHTML = '<i class="bi bi-hand-thumbs-up-fill"></i> Upvoted';
+                                this.disabled = true;
+                                this.classList.remove("btn-primary");
+                                this.classList.add("btn-success");
+                            })
+                            .catch(error => {
+                                console.error("Vote error:", error);
+                                alert("Error during vote: " + error);
+                            });
+                    } else {
+                        alert("Hive Keychain is required for upvoting.");
+                    }
+                {% else %}
+                    alert("Please login to upvote this post.");
+                    window.location.href = "{{ url_for('login') }}";
+                {% endif %}
+            });
+        }
 
-		if (cancelCommentBtn) {
-			cancelCommentBtn.addEventListener("click", function () {
-				commentFormContainer.style.display = "none";
-			});
-		}
+        // Share functionality
+        const shareBtn = document.querySelector(".share-btn");
+        if (shareBtn) {
+            shareBtn.addEventListener("click", function() {
+                const author = this.getAttribute("data-author");
+                const permlink = this.getAttribute("data-permlink");
+                const title = this.getAttribute("data-title");
 
-		// Upvote functionality (demo only)
-		const upvoteBtn = document.getElementById("upvote-post");
-		if (upvoteBtn) {
-			upvoteBtn.addEventListener("click", function () {
-				if (window.hive_keychain) {
-					alert(
-						"In a real implementation, this would broadcast an upvote to the Hive blockchain."
-					);
-				} else {
-					alert("Hive Keychain extension is required for upvoting.");
-				}
-			});
-		}
+                const shareUrl = `${window.location.origin}/post/${author}/${permlink}`;
+                const shareText = `Check out this post on HiveBuzz: ${title}`;
 
-		// Reblog functionality (demo only)
-		const reblogBtn = document.getElementById("reblog-post");
-		if (reblogBtn) {
-			reblogBtn.addEventListener("click", function () {
-				if (window.hive_keychain) {
-					alert(
-						"In a real implementation, this would broadcast a reblog operation to the Hive blockchain."
-					);
-				} else {
-					alert(
-						"Hive Keychain extension is required for reblogging."
-					);
-				}
-			});
-		}
-	});
+                try {
+                    if (navigator.share) {
+                        navigator.share({
+                            title: title,
+                            text: shareText,
+                            url: shareUrl
+                        });
+                    } else {
+                        // Fallback to clipboard
+                        navigator.clipboard.writeText(shareUrl).then(() => {
+                            alert("Post URL copied to clipboard!");
+                        });
+                    }
+                } catch (error) {
+                    console.error("Error sharing:", error);
+                    // Fallback for older browsers
+                    prompt("Copy this link to share:", shareUrl);
+                }
+            });
+        }
+    });
 </script>
 {% endblock %}

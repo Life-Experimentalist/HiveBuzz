@@ -1,99 +1,297 @@
-{% extends 'base.html' %} {% block title %}Dashboard - HiveBuzz{% endblock %} {%
-block content %}
-<div class="dashboard">
-	<div class="welcome-section">
-		<h2>Welcome, @{{ username }}!</h2>
-		<p>
-			Welcome to HiveBuzz, your decentralized social media platform built
-			on the Hive blockchain.
-		</p>
-	</div>
+{% extends 'base.html' %}
+{% block title %}Dashboard - HiveBuzz{% endblock %}
 
-	<div class="stats-section">
-		<div class="stat-card">
-			<div class="stat-icon">📊</div>
-			<div class="stat-info">
-				<h3>Your Activity</h3>
-				<p>Track your engagement on the Hive blockchain</p>
-			</div>
-		</div>
-		<div class="stat-card">
-			<div class="stat-icon">💰</div>
-			<div class="stat-info">
-				<h3>Earnings</h3>
-				<p>See how much you've earned from your content</p>
-			</div>
-		</div>
-		<div class="stat-card">
-			<div class="stat-icon">👥</div>
-			<div class="stat-info">
-				<h3>Network</h3>
-				<p>Your followers and the accounts you follow</p>
-			</div>
-		</div>
-	</div>
+{% block content %}
+<div class="dashboard-container">
+    <div class="welcome-section mb-5">
+        <h1 class="mb-3">Welcome, {{ user.username }}</h1>
+        <p class="lead text-muted">Your personal Hive blockchain dashboard</p>
+    </div>
 
-	<div class="dashboard-actions">
-		<a href="{{ url_for('posts') }}" class="action-card">
-			<div class="action-icon">📝</div>
-			<div class="action-info">
-				<h3>View Feed</h3>
-				<p>Check out the latest posts from the community</p>
-			</div>
-		</a>
-		<a href="{{ url_for('create_post') }}" class="action-card">
-			<div class="action-icon">✏️</div>
-			<div class="action-info">
-				<h3>Create Post</h3>
-				<p>Share your thoughts with the Hive community</p>
-			</div>
-		</a>
-		<a
-			href="{{ url_for('profile', username=username) }}"
-			class="action-card"
-		>
-			<div class="action-icon">👤</div>
-			<div class="action-info">
-				<h3>My Profile</h3>
-				<p>View your profile information</p>
-			</div>
-		</a>
-	</div>
+    <div class="row mb-5">
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Account Overview</h5>
+                    <a href="{{ url_for('wallet') }}" class="btn btn-sm btn-outline-primary">View Wallet</a>
+                </div>
+                <div class="card-body">
+                    <div class="account-stats">
+                        <div class="row text-center g-3">
+                            <div class="col-4">
+                                <div class="stat-item">
+                                    <div class="stat-value">{{ stats.wallet.hive }}</div>
+                                    <div class="stat-label">HIVE</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-item">
+                                    <div class="stat-value">{{ stats.wallet.hp }}</div>
+                                    <div class="stat-label">Hive Power</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-item">
+                                    <div class="stat-value">{{ stats.wallet.hbd }}</div>
+                                    <div class="stat-label">HBD</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-	<div class="recent-activity">
-		<h3>Recent Activity</h3>
-		<div id="activity-feed" class="loading">
-			<div class="spinner"></div>
-			<p>Loading your recent activity...</p>
-		</div>
-	</div>
+                    <div class="mt-4">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Reputation:</span>
+                            <span class="fw-bold">{{ stats.reputation }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Followers:</span>
+                            <span class="fw-bold">{{ stats.followers }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Following:</span>
+                            <span class="fw-bold">{{ stats.following }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Posts:</span>
+                            <span class="fw-bold">{{ stats.posts_count }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <a href="{{ url_for('create_post') }}" class="action-link">
+                                <div class="action-card">
+                                    <div class="action-icon">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </div>
+                                    <div class="action-text">
+                                        <h6 class="mb-0">Create Post</h6>
+                                        <small class="text-muted">Share your thoughts</small>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col-sm-6">
+                            <a href="{{ url_for('wallet') }}" class="action-link">
+                                <div class="action-card">
+                                    <div class="action-icon">
+                                        <i class="bi bi-wallet2"></i>
+                                    </div>
+                                    <div class="action-text">
+                                        <h6 class="mb-0">Wallet</h6>
+                                        <small class="text-muted">Manage your funds</small>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col-sm-6">
+                            <a href="{{ url_for('trending') }}" class="action-link">
+                                <div class="action-card">
+                                    <div class="action-icon">
+                                        <i class="bi bi-graph-up"></i>
+                                    </div>
+                                    <div class="action-text">
+                                        <h6 class="mb-0">Trending</h6>
+                                        <small class="text-muted">Discover content</small>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col-sm-6">
+                            <a href="{{ url_for('settings') }}" class="action-link">
+                                <div class="action-card">
+                                    <div class="action-icon">
+                                        <i class="bi bi-gear"></i>
+                                    </div>
+                                    <div class="action-text">
+                                        <h6 class="mb-0">Settings</h6>
+                                        <small class="text-muted">Customize HiveBuzz</small>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-7 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Recent Activity</h5>
+                    <a href="{{ url_for('profile', username=user.username) }}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for item in activity %}
+                        <div class="list-group-item activity-item">
+                            <div class="d-flex w-100">
+                                <div class="activity-icon me-3">
+                                    {% if item.type == 'post' %}
+                                    <i class="bi bi-file-earmark-text"></i>
+                                    {% elif item.type == 'comment' %}
+                                    <i class="bi bi-chat-left-text"></i>
+                                    {% elif item.type == 'upvote' %}
+                                    <i class="bi bi-hand-thumbs-up"></i>
+                                    {% else %}
+                                    <i class="bi bi-activity"></i>
+                                    {% endif %}
+                                </div>
+                                <div class="activity-details flex-grow-1">
+                                    <div class="d-flex justify-content-between">
+                                        <h6 class="mb-1">{{ item.title }}</h6>
+                                        <small class="text-muted">{{ item.time }}</small>
+                                    </div>
+                                    {% if item.link %}
+                                    <small><a href="{{ item.link }}">View Details</a></small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-5 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Trending Posts</h5>
+                    <a href="{{ url_for('trending') }}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for post in trending %}
+                        <a href="{{ url_for('view_post', author=post.author, permlink=post.permlink) }}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ post.title }}</h6>
+                                <small>@{{ post.author }}</small>
+                            </div>
+                            <small class="text-muted">{{ post.created }}</small>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-{% endblock %} {% block scripts %}
-<script>
-	// Simulate loading recent activity
-	document.addEventListener("DOMContentLoaded", function () {
-		const activityFeed = document.getElementById("activity-feed");
+{% endblock %}
 
-		// Simulate API call delay
-		setTimeout(function () {
-			activityFeed.innerHTML = `
-                <div class="activity-item">
-                    <div class="activity-icon">👍</div>
-                    <div class="activity-details">
-                        <p>You upvoted <a href="#">Welcome to HiveBuzz</a></p>
-                        <span class="activity-time">Just now</span>
-                    </div>
-                </div>
-                <div class="activity-item">
-                    <div class="activity-icon">✏️</div>
-                    <div class="activity-details">
-                        <p>You created a post <a href="#">Hello Hive World</a></p>
-                        <span class="activity-time">Yesterday</span>
-                    </div>
-                </div>
-            `;
-			activityFeed.classList.remove("loading");
-		}, 1500);
-	});
-</script>
+{% block styles %}
+<style>
+    .dashboard-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 1rem;
+    }
+
+    .account-stats {
+        margin-bottom: 1.5rem;
+    }
+
+    .stat-item {
+        padding: 1rem;
+        border-radius: 8px;
+        background-color: #f8f9fa;
+        transition: transform 0.2s;
+    }
+
+    body.dark-mode .stat-item {
+        background-color: #2d2d2d;
+    }
+
+    .stat-item:hover {
+        transform: translateY(-5px);
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--accent-primary);
+    }
+
+    .stat-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .action-link {
+        text-decoration: none;
+        color: inherit;
+        display: block;
+        height: 100%;
+    }
+
+    .action-card {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        border-radius: 8px;
+        background-color: #f8f9fa;
+        transition: all 0.3s;
+        height: 100%;
+    }
+
+    body.dark-mode .action-card {
+        background-color: #2d2d2d;
+    }
+
+    .action-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        background-color: var(--accent-light);
+        color: white;
+    }
+
+    body.dark-mode .action-card:hover {
+        background-color: var(--accent-dark);
+    }
+
+    .action-card:hover .text-muted {
+        color: rgba(255,255,255,0.8) !important;
+    }
+
+    .action-icon {
+        font-size: 1.5rem;
+        color: var(--accent-primary);
+        margin-right: 1rem;
+    }
+
+    .action-card:hover .action-icon {
+        color: white;
+    }
+
+    .activity-icon {
+        font-size: 1.25rem;
+        color: var(--accent-primary);
+        width: 24px;
+        text-align: center;
+    }
+
+    .activity-item {
+        transition: background-color 0.2s;
+    }
+
+    .activity-item:hover {
+        background-color: rgba(0,0,0,0.03);
+    }
+
+    body.dark-mode .activity-item:hover {
+        background-color: rgba(255,255,255,0.05);
+    }
+</style>
 {% endblock %}

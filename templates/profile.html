@@ -1,156 +1,512 @@
-{% extends 'base.html' %} {% block title %}{{ user.name }} Profile - HiveBuzz{%
-endblock %} {% block head %}
+{% extends 'base.html' %}
+{% block title %}@{{ profile.name }} - HiveBuzz{% endblock %}
+{% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-{% endblock %} {% block content %}
+{% endblock %}
+{% block content %}
 <div class="profile-container">
-	<div class="profile-header">
-		{% if metadata.profile and metadata.profile.profile_image %}
-		<img
-			src="{{ metadata.profile.profile_image }}"
-			alt="{{ user.name }}"
-			class="profile-image"
-		/>
-		{% else %}
-		<img
-			src="https://via.placeholder.com/150"
-			alt="{{ user.name }}"
-			class="profile-image"
-		/>
-		{% endif %}
+    <div class="profile-header">
+        <div class="profile-avatar">
+            <img src="https://images.hive.blog/u/{{ profile.name }}/avatar" alt="{{ profile.name }}" class="avatar-img">
+        </div>
+        <div class="profile-info">
+            <h2 class="profile-name">@{{ profile.name }}</h2>
 
-		<div class="profile-details">
-			<h2>@{{ user.name }}</h2>
+            {% if profile.about %}
+            <div class="profile-about">
+                {{ profile.about|safe }}
+            </div>
+            {% endif %}
 
-			{% if metadata.profile and metadata.profile.about %}
-			<p class="profile-bio">{{ metadata.profile.about }}</p>
-			{% endif %}
+            {% if profile.location or profile.website %}
+            <div class="profile-details mt-2 mb-3">
+                {% if profile.location %}
+                <span class="me-3"><i class="bi bi-geo-alt"></i> {{ profile.location }}</span>
+                {% endif %}
+                {% if profile.website %}
+                <span><i class="bi bi-link-45deg"></i> <a href="{{ profile.website }}" target="_blank">{{ profile.website }}</a></span>
+                {% endif %}
+            </div>
+            {% endif %}
 
-			<div class="profile-stats">
-				<div class="stat-item">
-					<span class="stat-value">{{ user.post_count or 0 }}</span>
-					<span class="stat-label">Posts</span>
-				</div>
-				<div class="stat-item">
-					<span class="stat-value"
-						>{{ user.follower_count or 0 }}</span
-					>
-					<span class="stat-label">Followers</span>
-				</div>
-				<div class="stat-item">
-					<span class="stat-value"
-						>{{ user.following_count or 0 }}</span
-					>
-					<span class="stat-label">Following</span>
-				</div>
-				<div class="stat-item">
-					<span class="stat-value"
-						>{{ user.reputation|default('0') }}</span
-					>
-					<span class="stat-label">Reputation</span>
-				</div>
-			</div>
+            <div class="profile-stats">
+                <div class="stat">
+                    <span class="stat-value">{{ profile.post_count|default(0) }}</span>
+                    <span class="stat-label">Posts</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value">{{ profile.followers_count|default(0) }}</span>
+                    <span class="stat-label">Followers</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value">{{ profile.following_count|default(0) }}</span>
+                    <span class="stat-label">Following</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value">{{ profile.reputation|default('0') }}</span>
+                    <span class="stat-label">Reputation</span>
+                </div>
+            </div>
 
-			<div class="profile-wallet mt-4">
-				<h4>Wallet</h4>
-				<div class="wallet-balances">
-					<div class="balance-item">
-						<span class="balance-label">HIVE</span>
-						<span class="balance-value"
-							>{{ user.balance|default('0 HIVE') }}</span
-						>
-					</div>
-					<div class="balance-item">
-						<span class="balance-label">HBD</span>
-						<span class="balance-value"
-							>{{ user.hbd_balance|default('0 HBD') }}</span
-						>
-					</div>
-					<div class="balance-item">
-						<span class="balance-label">SP</span>
-						<span class="balance-value"
-							>{{ user.vesting_shares|default('0 SP') }}</span
-						>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
+            {% if session.get('username') != profile.name %}
+            <div class="profile-actions">
+                <button class="btn btn-primary follow-btn" data-username="{{ profile.name }}">
+                    {% if profile.is_following|default(false) %}
+                    Unfollow
+                    {% else %}
+                    Follow
+                    {% endif %}
+                </button>
+                <button class="btn btn-outline-secondary send-message-btn" data-username="{{ profile.name }}">
+                    Message
+                </button>
+            </div>
+            {% else %}
+            <div class="profile-actions">
+                <a href="{{ url_for('settings') }}" class="btn btn-outline-primary">Edit Profile</a>
+                <a href="{{ url_for('wallet') }}" class="btn btn-outline-info ms-2">Wallet</a>
+            </div>
+            {% endif %}
 
-	{% if session.username == user.name %}
-	<div class="profile-activity-chart">
-		<h3>Activity Overview</h3>
-		<canvas id="activityChart" width="400" height="100"></canvas>
-	</div>
-	{% endif %}
+            {% if profile.is_demo %}
+            <div class="mt-3 demo-badge">
+                <span class="badge bg-warning text-dark">Demo Profile</span>
+                <small class="text-muted ms-2">This is a demo profile with simulated data</small>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 
-	<div class="profile-content">
-		<h3>Recent Activity</h3>
-		{% if recent_posts %}
-		<div class="recent-posts">
-			{% for post in recent_posts %}
-			<div class="post-item">
-				<a
-					href="{{ url_for('view_post', author=post.author, permlink=post.permlink) }}"
-					class="post-title-link"
-				>
-					<h4>{{ post.title }}</h4>
-				</a>
-				<div class="post-meta">
-					<span
-						>Posted: {{ post.created|default('Unknown date')
-						}}</span
-					>
-				</div>
-				<p class="post-excerpt">
-					{% if post.body|length > 150 %} {{ post.body[:150] }}... {%
-					else %} {{ post.body }} {% endif %}
-				</p>
-			</div>
-			{% endfor %}
-		</div>
-		{% else %}
-		<p class="placeholder-text">No recent activity found</p>
-		{% endif %}
-	</div>
+    {% if profile.is_demo %}
+    <div class="profile-metrics mb-4">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Activity Overview</h5>
+                        <span class="demo-data-badge">Demo Data</span>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="activityChart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Content Distribution</h5>
+                        <span class="demo-data-badge">Demo Data</span>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="contentDistributionChart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-8 mb-3">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Engagement Metrics</h5>
+                        <span class="demo-data-badge">Demo Data</span>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="engagementChart" height="150"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Top Tags</h5>
+                        <span class="demo-data-badge">Demo Data</span>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="tagsChart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="profile-content mt-4">
+        <ul class="nav nav-tabs" id="profileTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="posts-tab" data-bs-toggle="tab" data-bs-target="#posts" type="button">
+                    Posts
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="comments-tab" data-bs-toggle="tab" data-bs-target="#comments" type="button">
+                    Comments
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content mt-4" id="profileTabContent">
+            <!-- Posts Tab -->
+            <div class="tab-pane fade show active" id="posts" role="tabpanel">
+                {% if user_posts %}
+                <div class="feed-list">
+                    {% for post in user_posts %}
+                    <div class="feed-item">
+                        <a href="{{ url_for('view_post', author=post.author, permlink=post.permlink) }}" class="post-title-link">
+                            <h3 class="post-title">{{ post.title }}</h3>
+                        </a>
+                        <div class="post-meta">
+                            <span class="post-date">{{ post.created }}</span>
+                            {% if post.payout %}<span class="post-payout">${{ post.payout }}</span>{% endif %}
+                        </div>
+                        <div class="post-content">
+                            {% if post.body|length > 200 %}
+                                {{ post.body[:200]|safe }}...
+                                <a href="{{ url_for('view_post', author=post.author, permlink=post.permlink) }}" class="read-more">Read more</a>
+                            {% else %}
+                                {{ post.body|safe }}
+                            {% endif %}
+                        </div>
+                        <div class="post-actions">
+                            <button class="upvote-btn" data-author="{{ post.author }}" data-permlink="{{ post.permlink }}">
+                                👍 Upvote
+                            </button>
+                            <a href="{{ url_for('view_post', author=post.author, permlink=post.permlink) }}" class="comment-btn">
+                                💬 {{ post.comment_count|default(0) }} Comments
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="no-results">No posts found.</p>
+                {% endif %}
+            </div>
+
+            <!-- Comments Tab -->
+            <div class="tab-pane fade" id="comments" role="tabpanel">
+                {% if user_comments %}
+                <div class="comments-list">
+                    {% for comment in user_comments %}
+                    <div class="comment">
+                        <div class="comment-meta">
+                            <a href="{{ url_for('view_post', author=comment.parent_author, permlink=comment.parent_permlink) }}" class="comment-context">
+                                Re: {{ comment.parent_title|default('Post') }}
+                            </a>
+                            <span class="comment-date">{{ comment.created }}</span>
+                        </div>
+                        <div class="comment-content">
+                            {{ comment.body|safe }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="no-results">No comments found.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 </div>
-{% endblock %} {% block scripts %}
-<script>
-	document.addEventListener('DOMContentLoaded', function() {
-	    {% if session.username == user.name %}
-	    // Create activity chart for the user's own profile
-	    const ctx = document.getElementById('activityChart');
-	    if (ctx) {
-	        const chartData = {
-	            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-	            datasets: [{
-	                label: 'Posts',
-	                data: [3, 1, 4, 0, 2, 5, 1],
-	                backgroundColor: 'rgba(54, 162, 235, 0.5)',
-	                borderColor: 'rgba(54, 162, 235, 1)',
-	                borderWidth: 1
-	            }, {
-	                label: 'Comments',
-	                data: [5, 7, 2, 3, 8, 9, 2],
-	                backgroundColor: 'rgba(255, 99, 132, 0.5)',
-	                borderColor: 'rgba(255, 99, 132, 1)',
-	                borderWidth: 1
-	            }]
-	        };
+{% endblock %}
 
-	        new Chart(ctx, {
-	            type: 'bar',
-	            data: chartData,
-	            options: {
-	                responsive: true,
-	                scales: {
-	                    y: {
-	                        beginAtZero: true
-	                    }
-	                }
-	            }
-	        });
-	    }
-	    {% endif %}
-	});
+{% block styles %}
+<style>
+    /* Existing styles */
+
+    /* Demo indicator styles */
+    .demo-badge {
+        display: inline-block;
+    }
+
+    .demo-data-badge {
+        font-size: 0.75rem;
+        background-color: #ffc107;
+        color: #212529;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+    }
+
+    .profile-details {
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Follow/Unfollow functionality
+        const followBtn = document.querySelector(".follow-btn");
+        if (followBtn) {
+            followBtn.addEventListener("click", function() {
+                const username = this.getAttribute("data-username");
+
+                if (window.hive_keychain) {
+                    const currentUser = "{{ session.get('username', '') }}";
+                    if (!currentUser) {
+                        alert("Please log in to follow users.");
+                        return;
+                    }
+
+                    // In a real app, this would call the Hive blockchain to follow/unfollow
+                    const isFollowing = this.textContent.trim() === "Unfollow";
+                    const action = isFollowing ? "unfollow" : "follow";
+
+                    alert(`In a real implementation, this would ${action} @${username} on the Hive blockchain.`);
+
+                    // Toggle button text
+                    this.textContent = isFollowing ? "Follow" : "Unfollow";
+                } else {
+                    alert("Hive Keychain extension is required for following users.");
+                }
+            });
+        }
+
+        // Upvote functionality
+        const upvoteBtns = document.querySelectorAll(".upvote-btn");
+        upvoteBtns.forEach(btn => {
+            btn.addEventListener("click", function() {
+                const author = this.getAttribute("data-author");
+                const permlink = this.getAttribute("data-permlink");
+
+                if (window.hive_keychain) {
+                    const username = "{{ session.get('username', '') }}";
+                    if (!username) {
+                        alert("Please log in to upvote posts.");
+                        return;
+                    }
+
+                    // In a real app, this would call the Hive blockchain
+                    alert(`In a real implementation, this would upvote @${author}/${permlink} on the Hive blockchain.`);
+                } else {
+                    alert("Hive Keychain extension is required for upvoting.");
+                }
+            });
+        });
+
+        // Send message functionality
+        const msgBtn = document.querySelector(".send-message-btn");
+        if (msgBtn) {
+            msgBtn.addEventListener("click", function() {
+                const username = this.getAttribute("data-username");
+                const currentUser = "{{ session.get('username', '') }}";
+
+                if (!currentUser) {
+                    alert("Please log in to send messages.");
+                    return;
+                }
+
+                // In a real app, this would open a message form or dialog
+                const message = prompt(`Enter your message to @${username}:`);
+                if (message && message.trim()) {
+                    alert(`Your message would be sent to @${username} in a real implementation.`);
+                }
+            });
+        }
+
+        // Only initialize charts if this is a demo profile
+        const isDemo = {{ profile.is_demo|tojson }};
+
+        if (isDemo) {
+            // Configure the charts with appropriate options for both light and dark modes
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            const textColor = isDarkMode ? '#f5f5f5' : '#333333';
+            const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
+            // Chart.js global defaults for our theme
+            Chart.defaults.color = textColor;
+            Chart.defaults.borderColor = gridColor;
+
+            // Activity chart - Posts and Comments over time
+            const activityCtx = document.getElementById('activityChart');
+            if (activityCtx) {
+                // Sample data for demo only
+                const chartData = {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'Posts',
+                        data: [3, 5, 2, 7, 4, 6],
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 2,
+                        tension: 0.3
+                    }, {
+                        label: 'Comments',
+                        data: [7, 11, 5, 8, 9, 12],
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 2,
+                        tension: 0.3
+                    }]
+                };
+
+                new Chart(activityCtx, {
+                    type: 'line',
+                    data: chartData,
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            title: {
+                                display: true,
+                                text: 'Content Activity Over Time (Demo Data)'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: gridColor
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: gridColor
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Content distribution chart
+            const contentDistributionCtx = document.getElementById('contentDistributionChart');
+            if (contentDistributionCtx) {
+                const distributionData = {
+                    labels: ['Text Posts', 'Image Posts', 'Video Posts', 'Link Posts', 'Comments'],
+                    datasets: [{
+                        data: [45, 23, 12, 8, 32],
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(255, 159, 64, 0.7)',
+                            'rgba(153, 102, 255, 0.7)'
+                        ],
+                        borderWidth: 1
+                    }]
+                };
+
+                new Chart(contentDistributionCtx, {
+                    type: 'doughnut',
+                    data: distributionData,
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                            },
+                            title: {
+                                display: true,
+                                text: 'Content Type Distribution (Demo Data)'
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Engagement chart
+            const engagementCtx = document.getElementById('engagementChart');
+            if (engagementCtx) {
+                const engagementData = {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'Upvotes Received',
+                        data: [65, 59, 80, 81, 56, 55],
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)'
+                    }, {
+                        label: 'Comments Received',
+                        data: [28, 48, 40, 19, 36, 27],
+                        backgroundColor: 'rgba(255, 99, 132, 0.5)'
+                    }, {
+                        label: 'Reblogs',
+                        data: [12, 19, 13, 5, 12, 9],
+                        backgroundColor: 'rgba(75, 192, 192, 0.5)'
+                    }]
+                };
+
+                new Chart(engagementCtx, {
+                    type: 'bar',
+                    data: engagementData,
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            title: {
+                                display: true,
+                                text: 'Content Engagement Metrics (Demo Data)'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: gridColor
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: gridColor
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Tags chart
+            const tagsCtx = document.getElementById('tagsChart');
+            if (tagsCtx) {
+                const tagsData = {
+                    labels: ['hive', 'crypto', 'blockchain', 'programming', 'travel', 'photography'],
+                    datasets: [{
+                        label: 'Tag Usage',
+                        data: [65, 59, 90, 81, 45, 30],
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1,
+                        pointBackgroundColor: 'rgba(255, 99, 132, 1)'
+                    }]
+                };
+
+                new Chart(tagsCtx, {
+                    type: 'radar',
+                    data: tagsData,
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            title: {
+                                display: true,
+                                text: 'Most Used Tags (Demo Data)'
+                            }
+                        },
+                        scales: {
+                            r: {
+                                angleLines: {
+                                    color: gridColor
+                                },
+                                grid: {
+                                    color: gridColor
+                                },
+                                pointLabels: {
+                                    color: textColor
+                                },
+                                ticks: {
+                                    backdropColor: isDarkMode ? 'rgba(0, 0, 0, 0)' : 'rgba(255, 255, 255, 0)'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    });
 </script>
 {% endblock %}

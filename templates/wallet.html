@@ -1,0 +1,590 @@
+{% extends 'base.html' %} {% block title %}Wallet - HiveBuzz{% endblock %} {%
+block content %}
+<div class="wallet-container">
+	<h1 class="mb-4">Wallet</h1>
+	<p class="text-muted mb-4">
+		Manage your Hive blockchain funds and transactions
+	</p>
+
+	<div class="row">
+		<div class="col-lg-8">
+			<div class="card mb-4 wallet-balance-card">
+				<div class="card-header">
+					<h5 class="mb-0">Account Balance</h5>
+				</div>
+				<div class="card-body">
+					<div class="row g-4">
+						<div class="col-md-4">
+							<div class="currency-card">
+								<div class="currency-icon hive-icon">
+									<img
+										src="{{ url_for('static', filename='img/hive-logo.png') }}"
+										alt="HIVE"
+										onerror="this.src='https://cryptologos.cc/logos/hive-blockchain-hive-logo.png?v=023'"
+									/>
+								</div>
+								<div class="currency-details">
+									<h3 class="currency-value">
+										{{ wallet.hive_balance }}
+									</h3>
+									<p class="currency-name">HIVE</p>
+								</div>
+								<div class="currency-actions">
+									<button
+										class="btn btn-sm btn-outline-primary transfer-btn"
+										data-currency="HIVE"
+									>
+										Transfer
+									</button>
+								</div>
+							</div>
+						</div>
+						<div class="col-md-4">
+							<div class="currency-card">
+								<div class="currency-icon hp-icon">
+									<img
+										src="{{ url_for('static', filename='img/hp-logo.png') }}"
+										alt="HP"
+										onerror="this.src='https://cryptologos.cc/logos/hive-blockchain-hive-logo.png?v=023'"
+									/>
+								</div>
+								<div class="currency-details">
+									<h3 class="currency-value">
+										{{ wallet.hive_power }}
+									</h3>
+									<p class="currency-name">Hive Power</p>
+								</div>
+								<div class="currency-actions">
+									<button
+										class="btn btn-sm btn-outline-primary power-up-btn"
+									>
+										Power Up
+									</button>
+								</div>
+							</div>
+						</div>
+						<div class="col-md-4">
+							<div class="currency-card">
+								<div class="currency-icon hbd-icon">
+									<img
+										src="{{ url_for('static', filename='img/hbd-logo.png') }}"
+										alt="HBD"
+										onerror="this.src='https://hive.blog/images/hbd.png'"
+									/>
+								</div>
+								<div class="currency-details">
+									<h3 class="currency-value">
+										{{ wallet.hbd_balance }}
+									</h3>
+									<p class="currency-name">HBD</p>
+								</div>
+								<div class="currency-actions">
+									<button
+										class="btn btn-sm btn-outline-primary transfer-btn"
+										data-currency="HBD"
+									>
+										Transfer
+									</button>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="savings-section mt-4">
+						<h6 class="mb-3">Savings</h6>
+						<div
+							class="d-flex justify-content-between savings-item"
+						>
+							<span>HIVE Savings</span>
+							<span class="fw-bold"
+								>{{ wallet.savings_hive }}</span
+							>
+						</div>
+						<div
+							class="d-flex justify-content-between savings-item"
+						>
+							<span>HBD Savings</span>
+							<span class="fw-bold"
+								>{{ wallet.savings_hbd }}</span
+							>
+						</div>
+					</div>
+
+					<div class="vesting-section mt-4">
+						<h6 class="mb-3">Vesting Shares</h6>
+						<div
+							class="d-flex justify-content-between vesting-item"
+						>
+							<span>Total Vesting Shares</span>
+							<span class="fw-bold"
+								>{{ wallet.vesting_shares }}</span
+							>
+						</div>
+						<div
+							class="d-flex justify-content-between vesting-item"
+						>
+							<span>Delegated Vesting Shares</span>
+							<span class="fw-bold"
+								>{{ wallet.delegated_vesting_shares }}</span
+							>
+						</div>
+						<div
+							class="d-flex justify-content-between vesting-item"
+						>
+							<span>Received Vesting Shares</span>
+							<span class="fw-bold"
+								>{{ wallet.received_vesting_shares }}</span
+							>
+						</div>
+					</div>
+
+					<div class="mt-4">
+						<small class="text-muted"
+							>Last updated: {{ wallet.last_update }}</small
+						>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="col-lg-4">
+			<div class="card mb-4 wallet-actions-card">
+				<div class="card-header">
+					<h5 class="mb-0">Actions</h5>
+				</div>
+				<div class="card-body">
+					<div class="d-grid gap-2">
+						<button class="btn btn-primary" id="transferBtn">
+							<i class="bi bi-arrow-left-right"></i> Transfer
+						</button>
+						<button class="btn btn-outline-primary" id="powerUpBtn">
+							<i class="bi bi-arrow-up-circle"></i> Power Up
+						</button>
+						<button
+							class="btn btn-outline-primary"
+							id="powerDownBtn"
+						>
+							<i class="bi bi-arrow-down-circle"></i> Power Down
+						</button>
+						<button
+							class="btn btn-outline-primary"
+							id="delegateBtn"
+						>
+							<i class="bi bi-person-plus"></i> Delegate
+						</button>
+						<button
+							class="btn btn-outline-primary"
+							id="claimRewardsBtn"
+						>
+							<i class="bi bi-award"></i> Claim Rewards
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<div class="card mb-4 wallet-info-card">
+				<div class="card-header">
+					<h5 class="mb-0">Market Info</h5>
+				</div>
+				<div class="card-body">
+					<div class="d-flex justify-content-between info-item">
+						<span>HIVE Price (USD)</span>
+						<span class="fw-bold">$0.336</span>
+					</div>
+					<div class="d-flex justify-content-between info-item">
+						<span>HBD Price (USD)</span>
+						<span class="fw-bold">$0.994</span>
+					</div>
+					<div class="d-flex justify-content-between info-item">
+						<span>APR (HBD Savings)</span>
+						<span class="fw-bold">20.0%</span>
+					</div>
+					<div class="mt-3 text-muted">
+						<small
+							>Market data is for informational purposes
+							only</small
+						>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="card transactions-card">
+		<div class="card-header">
+			<h5 class="mb-0">Recent Transactions</h5>
+		</div>
+		<div class="card-body p-0">
+			<div class="table-responsive">
+				<table class="table table-hover transactions-table">
+					<thead>
+						<tr>
+							<th>Type</th>
+							<th>Details</th>
+							<th>Amount</th>
+							<th>Date</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for tx in transactions %}
+						<tr>
+							<td>
+								{% if tx.type == 'transfer' %}
+								<span class="badge bg-primary">Transfer</span>
+								{% elif tx.type == 'claim_reward_balance' %}
+								<span class="badge bg-success">Reward</span>
+								{% else %}
+								<span class="badge bg-secondary"
+									>{{ tx.type }}</span
+								>
+								{% endif %}
+							</td>
+							<td class="transaction-details">
+								{% if tx.type == 'transfer' %}
+								<div>
+									<span class="fw-bold"
+										>{{ 'Received from' if tx.to ==
+										wallet.username else 'Sent to' }}</span
+									>
+									<a
+										href="{{ url_for('profile', username=tx.from if tx.to == wallet.username else tx.to) }}"
+									>
+										@{{ tx.from if tx.to == wallet.username
+										else tx.to }}
+									</a>
+								</div>
+								{% if tx.memo %}
+								<div class="transaction-memo">
+									{{ tx.memo }}
+								</div>
+								{% endif %} {% elif tx.type ==
+								'claim_reward_balance' %}
+								<div>Claimed rewards</div>
+								{% else %}
+								<div>{{ tx.type }}</div>
+								{% endif %}
+							</td>
+							<td class="transaction-amount">
+								{% if tx.type == 'transfer' %}
+								<span
+									class="{{ 'text-success' if tx.to == wallet.username else 'text-danger' }}"
+								>
+									{{ '+' if tx.to == wallet.username else '-'
+									}} {{ tx.amount }}
+								</span>
+								{% elif tx.type == 'claim_reward_balance' %}
+								<div class="text-success">
+									+ {{ tx.reward_hive }}<br />
+									+ {{ tx.reward_hbd }}<br />
+									+ {{ tx.reward_vests }}
+								</div>
+								{% else %}
+								<span>-</span>
+								{% endif %}
+							</td>
+							<td>{{ tx.timestamp }}</td>
+						</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- Transfer Modal -->
+<div class="modal fade" id="transferModal" tabindex="-1" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="transferModalLabel">
+					Transfer Funds
+				</h5>
+				<button
+					type="button"
+					class="btn-close"
+					data-bs-dismiss="modal"
+					aria-label="Close"
+				></button>
+			</div>
+			<div class="modal-body">
+				<form id="transferForm">
+					<div class="mb-3">
+						<label for="transferTo" class="form-label">To</label>
+						<input
+							type="text"
+							class="form-control"
+							id="transferTo"
+							placeholder="Enter username"
+						/>
+					</div>
+					<div class="mb-3">
+						<label for="transferAmount" class="form-label"
+							>Amount</label
+						>
+						<div class="input-group">
+							<input
+								type="number"
+								class="form-control"
+								id="transferAmount"
+								placeholder="0.000"
+								step="0.001"
+								min="0.001"
+							/>
+							<select class="form-select" id="transferCurrency">
+								<option value="HIVE">HIVE</option>
+								<option value="HBD">HBD</option>
+							</select>
+						</div>
+					</div>
+					<div class="mb-3">
+						<label for="transferMemo" class="form-label"
+							>Memo (Optional)</label
+						>
+						<textarea
+							class="form-control"
+							id="transferMemo"
+							rows="3"
+							placeholder="Add a note to this transfer"
+						></textarea>
+						<div class="form-text">
+							Memos are public and visible on the blockchain
+						</div>
+					</div>
+				</form>
+				<div class="alert alert-info">
+					<i class="bi bi-info-circle"></i> This action requires your
+					active key in Hive Keychain
+				</div>
+			</div>
+			<div class="modal-footer">
+				<button
+					type="button"
+					class="btn btn-secondary"
+					data-bs-dismiss="modal"
+				>
+					Cancel
+				</button>
+				<button
+					type="button"
+					class="btn btn-primary"
+					id="submitTransferBtn"
+				>
+					Confirm Transfer
+				</button>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %} {% block styles %}
+<style>
+	.wallet-container {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 1rem;
+	}
+
+	.currency-card {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+		padding: 1.5rem 1rem;
+		border-radius: 12px;
+		background-color: #f8f9fa;
+		height: 100%;
+		transition: transform 0.3s, box-shadow 0.3s;
+	}
+
+	body.dark-mode .currency-card {
+		background-color: #2d2d2d;
+	}
+
+	.currency-card:hover {
+		transform: translateY(-5px);
+		box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+	}
+
+	.currency-icon {
+		width: 50px;
+		height: 50px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 0.75rem;
+		background-color: #fff;
+		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+	}
+
+	body.dark-mode .currency-icon {
+		background-color: #333;
+		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+	}
+
+	.currency-icon img {
+		max-width: 30px;
+		max-height: 30px;
+	}
+
+	.currency-details {
+		margin-bottom: 1rem;
+	}
+
+	.currency-value {
+		font-size: 1.5rem;
+		margin-bottom: 0.25rem;
+		color: var(--accent-primary);
+	}
+
+	.currency-name {
+		margin: 0;
+		color: #6c757d;
+	}
+
+	.savings-item,
+	.vesting-item,
+	.info-item {
+		padding: 0.5rem 0;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+	}
+
+	body.dark-mode .savings-item,
+	body.dark-mode .vesting-item,
+	body.dark-mode .info-item {
+		border-bottom-color: rgba(255, 255, 255, 0.05);
+	}
+
+	.savings-item:last-child,
+	.vesting-item:last-child,
+	.info-item:last-child {
+		border-bottom: none;
+	}
+
+	.wallet-actions-card .btn {
+		padding: 0.75rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		font-weight: 500;
+	}
+
+	.transactions-table td {
+		vertical-align: middle;
+	}
+
+	.transaction-details {
+		max-width: 300px;
+	}
+
+	.transaction-memo {
+		font-size: 0.85rem;
+		color: #6c757d;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 250px;
+	}
+
+	.transaction-amount {
+		font-weight: 500;
+	}
+
+	/* Responsive adjustments */
+	@media (max-width: 767px) {
+		.currency-card {
+			margin-bottom: 1rem;
+		}
+	}
+</style>
+{% endblock %} {% block scripts %}
+<script>
+	document.addEventListener("DOMContentLoaded", function () {
+		const transferBtn = document.getElementById("transferBtn");
+		const powerUpBtn = document.getElementById("powerUpBtn");
+		const powerDownBtn = document.getElementById("powerDownBtn");
+		const delegateBtn = document.getElementById("delegateBtn");
+		const claimRewardsBtn = document.getElementById("claimRewardsBtn");
+		const transferModal = new bootstrap.Modal(
+			document.getElementById("transferModal")
+		);
+		const submitTransferBtn = document.getElementById("submitTransferBtn");
+
+		// Transfer button click
+		if (transferBtn) {
+			transferBtn.addEventListener("click", function () {
+				transferModal.show();
+			});
+		}
+
+		// Transfer card buttons
+		const transferCardBtns = document.querySelectorAll(".transfer-btn");
+		transferCardBtns.forEach((btn) => {
+			btn.addEventListener("click", function () {
+				const currency = btn.getAttribute("data-currency");
+				document.getElementById("transferCurrency").value = currency;
+				transferModal.show();
+			});
+		});
+
+		// Submit transfer form
+		if (submitTransferBtn) {
+			submitTransferBtn.addEventListener("click", function () {
+				const to = document.getElementById("transferTo").value;
+				const amount = document.getElementById("transferAmount").value;
+				const currency =
+					document.getElementById("transferCurrency").value;
+				const memo = document.getElementById("transferMemo").value;
+
+				if (!to || !amount || parseFloat(amount) <= 0) {
+					alert("Please enter a valid username and amount");
+					return;
+				}
+
+				// In a real app, this would use Hive Keychain to submit the transfer
+				alert(
+					`This would transfer ${amount} ${currency} to ${to} with memo: "${memo}" on a real blockchain implementation.`
+				);
+				transferModal.hide();
+			});
+		}
+
+		// Power Up button click
+		if (powerUpBtn) {
+			powerUpBtn.addEventListener("click", function () {
+				alert(
+					"Power Up functionality would be implemented here using Hive Keychain"
+				);
+			});
+		}
+
+		// Power Down button click
+		if (powerDownBtn) {
+			powerDownBtn.addEventListener("click", function () {
+				alert(
+					"Power Down functionality would be implemented here using Hive Keychain"
+				);
+			});
+		}
+
+		// Delegate button click
+		if (delegateBtn) {
+			delegateBtn.addEventListener("click", function () {
+				alert(
+					"Delegation functionality would be implemented here using Hive Keychain"
+				);
+			});
+		}
+
+		// Claim Rewards button click
+		if (claimRewardsBtn) {
+			claimRewardsBtn.addEventListener("click", function () {
+				alert(
+					"Claim Rewards functionality would be implemented here using Hive Keychain"
+				);
+			});
+		}
+	});
+</script>
+{% endblock %}
