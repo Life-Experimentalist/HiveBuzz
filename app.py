@@ -1,9 +1,11 @@
 import atexit
+import json
 import logging
 import os
 import time
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from functools import wraps
+
 import bleach
 
 # Add imports for markdown processing
@@ -12,6 +14,7 @@ from dotenv import load_dotenv
 from flask import (
     Blueprint,
     Flask,
+    Response,
     flash,
     g,
     jsonify,
@@ -19,6 +22,7 @@ from flask import (
     render_template,
     request,
     session,
+    stream_with_context,
     url_for,
 )
 from markupsafe import Markup
@@ -36,11 +40,11 @@ from utils.hiveauth import init_hiveauth
 # Import our HiveSigner and HiveAuth utils
 from utils.hivesigner import get_hivesigner_client, init_hivesigner
 
-# Add the new posts cache
-from utils.posts_cache import get_posts_cache, init_posts_cache
-
 # Register markdown filter using our utility
 from utils.markdown_utils import setup_markdown_filter
+
+# Add the new posts cache
+from utils.posts_cache import get_posts_cache, init_posts_cache  # noqa: F401
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -543,7 +547,7 @@ def posts():
             {
                 "initializing": is_initializing,
                 "message": f"Loading {feed_type} posts...",
-                "timestamp": datetime.now(UTC).isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
 
@@ -552,7 +556,10 @@ def posts():
         # Use a short timeout to get posts - prevents long blocking operations
         start_time = time.time()
         posts_data = posts_cache.get_posts(
-            feed_type=feed_type, tag=tag, limit=20, timeout=0.5
+            feed_type=feed_type,
+            tag=tag,
+            limit=50,
+            timeout=0.5,  # Limit initial load to 50
         )
         logger.debug(f"Posts fetch took {time.time() - start_time:.3f}s")
 
@@ -1145,6 +1152,7 @@ def settings():
 def wallet():
     """User wallet page with real blockchain data"""
     username = session["username"]
+    is_demo = session.get("auth_method") == "demo"
 
     # Log this activity
     db.log_user_activity(username, "page_view", {"page": "wallet"})
@@ -1154,15 +1162,19 @@ def wallet():
         hive_api_client = get_hive_api()
 
         # Fetch wallet data and transaction history
-        wallet_data = hive_api_client.get_user_wallet(username)
-        transactions = hive_api_client.get_account_history(username, limit=20)
+        if is_demo:
+            wallet_data = hive_api_client._get_mock_wallet(username)
+            transactions = hive_api_client._get_mock_account_history(username, limit=20)
+        else:
+            wallet_data = hive_api_client.get_user_wallet(username)
+            transactions = hive_api_client.get_account_history(username, limit=20)
 
         # Add market data (in production, fetch from market API)
         market_data = {
             "hive_usd": 0.336,
             "hbd_usd": 0.994,
             "savings_apr": 20.0,
-            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         }
 
         return render_template(
@@ -1170,6 +1182,7 @@ def wallet():
             wallet=wallet_data,
             transactions=transactions,
             market=market_data,
+            is_demo=is_demo,  # Pass is_demo to the template
         )
     except Exception as e:
         # Log the error
@@ -1194,6 +1207,7 @@ def wallet():
                 "last_updated": "Data unavailable",
             },
             error=True,
+            is_demo=is_demo,  # Pass is_demo to the template
         )
 
 
@@ -1662,49 +1676,6 @@ def cleanup_on_exit():
 
 atexit.register(cleanup_on_exit)
 
-if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))
-    debug = os.getenv("FLASK_ENV") == "development"
-
-    # Get API instance to make it available
-    api = get_hive_api()
-
-    # Add waitress server for production use
-    if not debug:
-        try:
-            import logging.handlers
-
-            from waitress import serve
-
-            # Configure a callback to log when server is ready
-            class ServerReadyHandler(logging.Handler):
-                def emit(self, record):
-                    if "task" in record.msg and "running" in record.msg:
-                        logger.info(
-                            f"✅ HiveBuzz server is ready to accept requests on port {port}"
-                        )
-
-            # Add our custom handler to the waitress logger
-            waitress_logger = logging.getLogger("waitress")
-            waitress_logger.addHandler(ServerReadyHandler())
-
-            # Log that we're starting up
-            logger.info(f"Starting HiveBuzz server on port {port}")
-            serve(app, host="0.0.0.0", port=port, threads=4)
-        except ImportError:
-            logger.warning(
-                "Waitress not installed, falling back to Flask development server"
-            )
-            app.run(host="0.0.0.0", port=port, debug=debug)
-    else:
-        # For development, use the Flask built-in server
-        logger.info(f"Starting HiveBuzz development server on port {port}")
-        logger.info(
-            f"✅✅ HiveBuzz development server will be available at http://127.0.0.1:{port}"
-        )
-        app.run(host="0.0.0.0", port=port, debug=debug, threaded=True)
-
-
 @app.template_filter("markdown")
 def render_markdown(text):
     """Convert markdown text to safe HTML"""
@@ -1767,3 +1738,125 @@ def render_markdown(text):
     )
 
     return Markup(clean_html)
+
+
+@app.route("/api/posts/stream")
+def stream_posts():
+    """Stream new posts to the client using Server-Sent Events"""
+
+    def event_stream():
+        try:
+            # Simulate new posts being added over time
+            while True:
+                # Fetch the latest posts (e.g., from a database or API)
+                new_posts = get_new_posts()  # Replace with your actual function
+
+                if new_posts:
+                    # Yield the new posts as a JSON object
+                    yield f"data: {json.dumps({'posts': new_posts})}\n\n"
+
+                time.sleep(5)  # Adjust the interval as needed
+
+        except GeneratorExit:
+            logger.info("Client disconnected from event stream")
+
+    return Response(stream_with_context(event_stream()), mimetype="text/event-stream")
+
+
+def get_new_posts():
+    """Dummy function to simulate fetching new posts"""
+    # Replace this with your actual logic to fetch new posts from the Hive blockchain
+    # or your data source
+    time.sleep(2)  # Simulate network delay
+    return [
+        {
+            "id": 4,
+            "author": "newuser",
+            "permlink": "new-post",
+            "title": "A New Post",
+            "body": "This is a new post added dynamically.",
+            "created": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            "payout": "5.00",
+            "tags": ["hivebuzz", "new"],
+            "vote_count": 10,
+            "comment_count": 2,
+        }
+    ]
+
+
+@app.route("/api/posts/new")
+def get_new_posts_api():
+    """API endpoint to get new posts"""
+    feed_type = request.args.get("feed", "trending")
+    tag = request.args.get("tag")
+
+    try:
+        # Replace this with your actual logic to fetch new posts from the Hive blockchain
+        new_posts = get_new_posts_from_blockchain(feed_type, tag)
+        return jsonify({"posts": new_posts})
+    except Exception as e:
+        logger.error(f"Error fetching new posts: {e}")
+        return jsonify({"error": str(e), "posts": []})
+
+
+def get_new_posts_from_blockchain(feed_type, tag):
+    """Dummy function to simulate fetching new posts from the Hive blockchain"""
+    # Replace this with your actual logic to fetch new posts from the Hive blockchain
+    time.sleep(1)  # Simulate network delay
+    return [
+        {
+            "id": 4,
+            "author": "newuser",
+            "permlink": "new-post",
+            "title": "A Newer Post",
+            "body": "This is a newer post added dynamically.",
+            "created": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            "payout": "5.00",
+            "tags": ["hivebuzz", "new"],
+            "vote_count": 10,
+            "comment_count": 2,
+        }
+    ]
+
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 5000))
+    debug = os.getenv("FLASK_ENV") == "development"
+
+    # Get API instance to make it available
+    api = get_hive_api()
+
+    # Add waitress server for production use
+    if not debug:
+        try:
+            import logging.handlers
+
+            from waitress import serve
+
+            # Configure a callback to log when server is ready
+            class ServerReadyHandler(logging.Handler):
+                def emit(self, record):
+                    if "task" in record.msg and "running" in record.msg:
+                        logger.info(
+                            f"✅ HiveBuzz server is ready to accept requests on port {port}"
+                        )
+
+            # Add our custom handler to the waitress logger
+            waitress_logger = logging.getLogger("waitress")
+            waitress_logger.addHandler(ServerReadyHandler())
+
+            # Log that we're starting up
+            logger.info(f"Starting HiveBuzz server on port {port}")
+            serve(app, host="0.0.0.0", port=port, threads=4)
+        except ImportError:
+            logger.warning(
+                "Waitress not installed, falling back to Flask development server"
+            )
+            app.run(host="0.0.0.0", port=port, debug=debug)
+    else:
+        # For development, use the Flask built-in server
+        logger.info(f"Starting HiveBuzz development server on port {port}")
+        logger.info(
+            f"✅✅ HiveBuzz development server will be available at http://127.0.0.1:{port}"
+        )
+        app.run(host="0.0.0.0", port=port, debug=debug, threaded=True)

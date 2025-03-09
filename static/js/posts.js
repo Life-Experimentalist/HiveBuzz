@@ -1,6 +1,6 @@
 /**
  * Posts functionality for HiveBuzz
- * Handles post interactions, voting, and infinite scrolling
+ * Handles post interactions, voting, dynamic updates, and infinite scrolling
  */
 
 class PostsManager {
@@ -10,44 +10,82 @@ class PostsManager {
 		this.hasMorePosts = true;
 		this.postsContainer = document.getElementById("posts-container");
 		this.loadingIndicator = document.getElementById("loading-posts");
-		this.refreshBtn = document.getElementById("refreshBtn");
-		this.voteButtons = document.querySelectorAll(".vote-btn");
+		this.feedType = document.body.dataset.feedType || "trending";
+		this.tag = document.body.dataset.tag || "";
+		this.username = document.body.dataset.username || "";
+		this.updateInterval = 10000; // Check for updates every 10 seconds
 
 		// Initialize components
-		this.initRefreshButton();
-		this.initVoteButtons();
+		this.loadInitialPosts();
 		this.initInfiniteScroll();
+		this.initPeriodicUpdates();
 	}
 
 	/**
-	 * Initialize refresh button
+	 * Initialize periodic updates using AJAX
 	 */
-	initRefreshButton() {
-		if (this.refreshBtn) {
-			this.refreshBtn.addEventListener("click", () => {
-				// Show loading spinner on the button
-				const originalHtml = this.refreshBtn.innerHTML;
-				this.refreshBtn.innerHTML =
-					'<span class="spinner-border spinner-border-sm me-2" role="status"></span> Loading...';
-				this.refreshBtn.disabled = true;
+	initPeriodicUpdates() {
+		setInterval(() => {
+			this.loadNewPosts();
+		}, this.updateInterval);
+	}
 
-				// Reload the page
-				window.location.reload();
-			});
+	/**
+	 * Load new posts using AJAX
+	 */
+	async loadNewPosts() {
+		try {
+			const response = await fetch(
+				`/api/posts/new?feed=${this.feedType}&tag=${this.tag}`
+			);
+
+			if (!response.ok) {
+				throw new Error(
+					`Error ${response.status}: ${response.statusText}`
+				);
+			}
+
+			const data = await response.json();
+
+			if (Array.isArray(data.posts) && data.posts.length > 0) {
+				this.addPostsToContainer(data.posts);
+			}
+		} catch (error) {
+			console.error("Error loading new posts:", error);
+			this.showNotification("Failed to load new posts", "danger");
 		}
 	}
 
 	/**
-	 * Initialize vote buttons for all posts
+	 * Add new posts to the container
+	 * @param {Array} posts - Array of post objects
 	 */
-	initVoteButtons() {
-		this.voteButtons.forEach((btn) => {
+	addPostsToContainer(posts) {
+		posts.forEach((post) => {
+			const postElement = this.createPostElement(post);
+			this.postsContainer.insertBefore(
+				postElement,
+				this.postsContainer.firstChild
+			); // Add to the beginning
+			this.initVoteButtons(postElement);
+		});
+	}
+
+	/**
+	 * Initialize vote buttons for a given post element
+	 * @param {HTMLElement} postElement - The container for the post
+	 */
+	initVoteButtons(postElement) {
+		const voteButtons = postElement.querySelectorAll(
+			".vote-btn:not(.initialized)"
+		);
+		voteButtons.forEach((btn) => {
+			btn.classList.add("initialized"); // Mark as initialized
 			btn.addEventListener("click", async (event) => {
 				event.preventDefault();
 
 				const author = btn.dataset.author;
 				const permlink = btn.dataset.permlink;
-				const username = btn.dataset.username;
 
 				// Check if Hive Keychain is available
 				if (
@@ -61,7 +99,7 @@ class PostsManager {
 					return;
 				}
 
-				await this.castVote(btn, username, author, permlink);
+				await this.castVote(btn, this.username, author, permlink);
 			});
 		});
 	}
@@ -144,26 +182,19 @@ class PostsManager {
 	}
 
 	/**
-	 * Load more posts when scrolling
+	 * Load initial posts
 	 */
-	async loadMorePosts() {
-		this.isLoading = true;
+	async loadInitialPosts() {
+		if (!this.postsContainer) return;
 
-		// Show loading indicator
+		this.isLoading = true;
 		if (this.loadingIndicator) {
 			this.loadingIndicator.classList.remove("d-none");
 		}
 
 		try {
-			const feedType = document.body.dataset.feedType || "trending";
-			const tag = document.body.dataset.tag || "";
-
-			// Increment page number
-			this.page++;
-
-			// Make AJAX request to load more posts
 			const response = await fetch(
-				`/api/posts?feed=${feedType}&tag=${tag}&page=${this.page}`
+				`/api/posts?feed=${this.feedType}&tag=${this.tag}&page=${this.page}`
 			);
 
 			if (!response.ok) {
@@ -179,21 +210,60 @@ class PostsManager {
 				data.posts.forEach((post) => {
 					const postElement = this.createPostElement(post);
 					this.postsContainer.appendChild(postElement);
+					this.initVoteButtons(postElement);
 				});
+			} else {
+				// No more posts
+				this.hasMorePosts = false;
+				if (this.loadingIndicator) {
+					this.loadingIndicator.innerHTML = "<p>No posts found</p>";
+				}
+			}
+		} catch (error) {
+			console.error("Error loading initial posts:", error);
+			this.showNotification("Failed to load initial posts", "danger");
+		} finally {
+			this.isLoading = false;
+			if (this.loadingIndicator) {
+				this.loadingIndicator.classList.add("d-none");
+			}
+		}
+	}
 
-				// Initialize vote buttons on new posts
-				const newVoteButtons = this.postsContainer.querySelectorAll(
-					".vote-btn:not(.initialized)"
+	/**
+	 * Load more posts when scrolling
+	 */
+	async loadMorePosts() {
+		this.isLoading = true;
+
+		// Show loading indicator
+		if (this.loadingIndicator) {
+			this.loadingIndicator.classList.remove("d-none");
+		}
+
+		try {
+			// Increment page number
+			this.page++;
+
+			// Make AJAX request to load more posts
+			const response = await fetch(
+				`/api/posts?feed=${this.feedType}&tag=${this.tag}&page=${this.page}`
+			);
+
+			if (!response.ok) {
+				throw new Error(
+					`Error ${response.status}: ${response.statusText}`
 				);
-				newVoteButtons.forEach((btn) => {
-					btn.classList.add("initialized");
-					btn.addEventListener("click", async (event) => {
-						event.preventDefault();
-						const author = btn.dataset.author;
-						const permlink = btn.dataset.permlink;
-						const username = btn.dataset.username;
-						await this.castVote(btn, username, author, permlink);
-					});
+			}
+
+			const data = await response.json();
+
+			if (Array.isArray(data.posts) && data.posts.length > 0) {
+				// Append new posts to container
+				data.posts.forEach((post) => {
+					const postElement = this.createPostElement(post);
+					this.postsContainer.appendChild(postElement);
+					this.initVoteButtons(postElement);
 				});
 			} else {
 				// No more posts
@@ -225,16 +295,20 @@ class PostsManager {
 	 * @returns {HTMLElement} - Post element
 	 */
 	createPostElement(post) {
-		// This is a simplified version, you would need to implement this based
-		// on your actual post card HTML structure
 		const col = document.createElement("div");
 		col.className = "col";
 		col.innerHTML = `
             <div class="card h-100 post-card">
-                <!-- Post content would go here -->
                 <div class="card-body">
                     <h5 class="card-title">${post.title}</h5>
                     <p>by @${post.author}</p>
+                    <button class="btn btn-sm btn-outline-primary vote-btn"
+                            data-author="${post.author}"
+                            data-permlink="${post.permlink}"
+                            data-username="${this.username}">
+                        <i class="bi bi-hand-thumbs-up"></i>
+                        <span class="vote-count">${post.vote_count}</span>
+                    </button>
                 </div>
             </div>
         `;

@@ -1,146 +1,240 @@
 # HiveBuzz
 
-A Flask-based web application for interacting with the Hive blockchain.
+A Flask-based web application providing a seamless interface for the Hive blockchain, enabling users to authenticate, view content, and broadcast transactions.
 
 ## Overview
-HiveBuzz is a decentralized social media application built on the Hive blockchain. It allows users to authenticate using Hive Keychain, view posts from the Hive blockchain, and create new content.
+
+HiveBuzz is a decentralized social media application built on the Hive blockchain. It provides multiple secure authentication methods (Hive Keychain, HiveSigner, and HiveAuth), allows users to browse blockchain content, create posts, and manage Hive wallet functions—all through an intuitive interface with customizable themes.
 
 ## Features
-- **Authentication**: Users can log in using Hive Keychain
-- **Feed Display**: View a list of posts fetched from the Hive blockchain
-- **Post Creation**: Create and submit new posts to the Hive blockchain
-- **User Profiles**: View profiles with data from the Hive blockchain
-- Login with HiveKeychain, HiveSigner, or HiveAuth
-- View and create Hive blockchain content
-- Responsive design with light/dark theme
-- User wallet management
-- SQLite database for caching and local data storage
+
+- **Multi-method Authentication**:
+	- ✅ Hive Keychain browser extension integration
+	- ✅ HiveSigner OAuth-like authentication flow
+	- ✅ HiveAuth mobile QR code authentication
+
+- **Blockchain Data Reading**:
+	- ✅ View trending, hot, and new posts from the Hive blockchain
+	- ✅ Browse user profiles with reputation and account details
+	- ✅ Examine wallet balances and transaction history
+
+- **Transaction Broadcasting**:
+	- ✅ Create and publish posts directly to the Hive blockchain
+	- ✅ Vote on content using Hive Keychain
+	- ✅ Power up/down HIVE and transfer funds between accounts
+
+- **Additional Features**:
+	- Responsive design with light/dark theme toggle
+	- User preferences stored locally
+	- Content caching for improved performance
+	- Post and comment rendering with markdown support
+
+## Hive APIs Used
+
+HiveBuzz leverages multiple Hive blockchain APIs for additional functionality:
+
+1. **`condenser_api.get_accounts`**: Fetches user profile data
+2. **`condenser_api.get_content`**: Retrieves post and comment content
+3. **`condenser_api.get_discussions_by_trending`**: Gets trending posts
+4. **`condenser_api.get_discussions_by_created`**: Gets newest posts
+5. **`condenser_api.get_discussions_by_hot`**: Gets hot posts
+6. **`database_api.find_accounts`**: Searches for user accounts
+7. **`account_history_api.get_account_history`**: Retrieves user activity history
+8. **`rc_api.find_rc_accounts`**: Gets resource credit information
+9. **`bridge.get_ranked_posts`**: Fetches ranked posts (via Hivemind)
+10. **`bridge.get_discussion`**: Gets full discussion threads
 
 ## Technology Stack
-- **Backend**: Flask (Python)
+
+- **Backend**: Python with Flask framework
 - **Frontend**: HTML, CSS, JavaScript
-- **Blockchain Integration**: Hive Keychain, Hive API
+- **Storage**: SQLite for caching and user preferences
+- **Blockchain Integration**: Hive Keychain, HiveSigner API, HiveAuth
+- **APIs**: Hive blockchain API, dbuzz API integration
 
 ## Project Structure
+
 ```
-HiveChain
-├── src
-│   ├── api
-│   │   ├── hiveApi.js       # API calls to Hive blockchain
-│   │   └── dbuzzApi.js      # API calls to dbuzz platform
-│   ├── components
-│   │   ├── Auth
-│   │   │   ├── HiveAuth.js  # HiveAuth implementation
-│   │   │   ├── KeychainAuth.js  # Keychain auth implementation
-│   │   │   └── Login.js     # Main login component
-│   │   ├── Feed
-│   │   │   ├── FeedItem.js  # Individual post component
-│   │   │   └── FeedList.js  # List of posts component
-│   │   └── Transaction
-│   │       └── PostForm.js  # Form to create new posts
-│   ├── utils
-│   │   ├── hiveUtils.js     # Utility functions for Hive
-│   │   └── keychainUtils.js # Utility functions for Keychain
-│   ├── App.js               # Main application component
-│   └── index.js             # Entry point
-├── public
-│   ├── index.html
-│   └── manifest.json
-├── package.json
-├── .env                     # Environment variables
-└── README.md
+HiveBuzz/
+├── app.py                 # Main Flask application
+├── config.py              # Configuration settings
+├── database.py            # Database operations
+├── session_manager.py     # User session management
+├── requirements.txt       # Python dependencies
+├── static/                # Static assets
+│   ├── css/               # Stylesheets
+│   ├── js/                # JavaScript files
+│   │   ├── hive-keychain.js  # Keychain integration
+│   │   ├── hiveauth.js    # HiveAuth integration
+│   │   ├── hivesigner.js  # HiveSigner integration
+│   │   └── posts.js       # Post management
+│   └── img/               # Image assets
+├── templates/             # HTML templates
+│   ├── base.html          # Base template
+│   ├── login.html         # Authentication page
+│   ├── posts.html         # Post listing page
+│   ├── wallet.html        # Wallet management
+│   └── profile.html       # User profile page
+└── utils/                 # Utility modules
+		├── hive_api.py        # Hive blockchain API client
+		├── hivesigner.py      # HiveSigner utilities
+		├── hiveauth.py        # HiveAuth integration
+		├── markdown_utils.py  # Content formatting
+		└── posts_cache.py     # Post caching system
+```
+
+## Authentication Methods
+
+### 1. Hive Keychain
+
+Users can securely authenticate using the Hive Keychain browser extension, which signs a challenge without exposing private keys:
+
+```javascript
+window.hive_keychain.requestSignBuffer(
+		username,
+		`Login to HiveBuzz: ${challenge}`,
+		"Posting",
+		(response) => {
+				if (response.success) {
+						// Authentication successful
+				}
+		}
+);
+```
+
+### 2. HiveSigner
+
+OAuth-like authentication flow where users are redirected to HiveSigner to approve the application:
+
+```javascript
+// HiveSigner authentication redirect
+const authUrl = HiveSigner.getAuthUrl(username, state);
+window.location.href = authUrl;
+```
+
+### 3. HiveAuth
+
+Mobile-friendly authentication via QR code scanning:
+
+```javascript
+// Generate HiveAuth QR code
+const authData = await hiveAuthInstance.getAuthData();
+QRCode.toCanvas(document.getElementById('hiveauth-qrcode'), authData.login_url);
+```
+
+## Reading Data from Hive
+
+HiveBuzz reads data from the Hive blockchain through several methods:
+
+```python
+# Get user profile data
+hive_api_client = get_hive_api()
+user_data = hive_api_client.get_account(username)
+
+# Fetch trending posts
+trending_posts = posts_cache.get_posts(
+		feed_type="trending",
+		tag=tag_filter,
+		limit=20
+)
+
+# Get account history/transactions
+history = hive_api_client.get_account_history(username, limit=20)
+
+# Get wallet balances
+wallet_data = hive_api_client.get_wallet_data(username)
+```
+
+## Broadcasting Transactions
+
+Users can broadcast various transactions to the Hive blockchain:
+
+```javascript
+// Vote on content
+HiveKeychainHelper.requestVote(username, author, permlink, weight)
+		.then(response => {
+				if (response.success) {
+						// Vote successful
+				}
+		});
+
+// Create a post
+const operations = [
+		["comment", {
+				parent_author: "",
+				parent_permlink: mainTag,
+				author: username,
+				permlink: permlink,
+				title: title,
+				body: body,
+				json_metadata: JSON.stringify({ tags: tags })
+		}]
+];
+
+window.hive_keychain.requestBroadcast(
+		username,
+		operations,
+		"posting",
+		response => {
+				// Handle response
+		}
+);
 ```
 
 ## Setup Instructions
 
 ### Prerequisites
-- Python 3.8 or higher
+- Python 3.9 or higher
 - pip (Python package manager)
-- Git
-- A modern web browser with Hive Keychain extension installed
+- A modern web browser with Hive Keychain extension installed (optional)
 
 ### Installation Steps
 1. Clone the repository:
-   ```
-   git clone <repository-url>
-   cd HiveChain
-   ```
+	 ```bash
+	 git clone https://github.com/Life-Experimentalist/HiveBuzz
+	 cd HiveBuzz
+	 ```
 
-2. Create a virtual environment:
-   ```
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+2. Create and activate a virtual environment:
+	 ```bash
+	 python -m venv venv
+	 source venv/bin/activate  # On Windows: venv\Scripts\activate
+	 ```
 
 3. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
+	 ```bash
+	 pip install -r requirements.txt
+	 ```
 
-4. Create a `.env` file in the root directory based on the `.env.example`:
-   ```
-   cp .env.example .env
-   ```
-   Then edit the file to match your configuration.
+4. Create a .env file in the root directory:
+	 ```
+	 SECRET_KEY=your-secret-key
+	 HIVESIGNER_APP_NAME=your-hivesigner-app-name
+	 HIVESIGNER_CLIENT_SECRET=your-hivesigner-client-secret
+	 APP_URL=http://localhost:5000
+	 ENVIRONMENT=development
+	 ```
 
-5. Run the setup script:
-   ```
-   python setup.py
-   ```
+5. Initialize the database:
+	 ```bash
+	 python -c "import database; database.init_db()"
+	 ```
 
-6. Start the development server:
-   ```
-   flask run
-   ```
-   The application will be available at http://localhost:5000/
-
-### Fixing Compatibility Issues
-If you encounter compatibility issues, follow these steps:
-1. Ensure you are using the correct versions of Node.js and npm as specified in the prerequisites.
-2. Delete the `node_modules` directory and the `package-lock.json` file:
-   ```
-   rm -rf node_modules package-lock.json
-   ```
-3. Reinstall dependencies:
-   ```
-   npm install
-   ```
-4. If the issue persists, try updating the dependencies to their latest versions:
-   ```
-   npm update
-   ```
-
-### Building for Production
-To create a production build:
-```
-npm run build
-```
-
-The build artifacts will be stored in the `build/` directory.
-
-### Running Tests
-```
-npm test
-```
+6. Run the application:
+	 ```bash
+	 flask run
+	 ```
+	 The application will be available at http://localhost:5000/
 
 ## Database Management
 
-HiveBuzz uses SQLite for database storage. The database file is created at `hivebuzz.db` in the project root directory.
-
-### Database Schema
-
-- **users** - User information
-- **sessions** - Session management
-- **user_preferences** - User preferences and settings
-- **cached_posts** - Post caching
-- **activity_logs** - User activity tracking
-
-### Database Tools
-
-For database management, use the `db_manager.py` CLI tool:
+HiveBuzz uses SQLite for database storage:
 
 ```bash
 # Initialize the database
+python -c "import database; database.init_db()"
+
+# Create a database management tool
 python db_manager.py init
 
 # Show database statistics
@@ -148,52 +242,16 @@ python db_manager.py stats
 
 # Clear expired sessions
 python db_manager.py clear-sessions
-
-# Show information about a specific user
-python db_manager.py user-info <username>
-
-# Clean up old data (older than 30 days)
-python db_manager.py cleanup --days=30
-
-# Optimize database storage
-python db_manager.py vacuum
-
-# Backup database to SQL file
-python db_manager.py backup
 ```
 
-## Technologies Used
-- React for building the user interface
-- Hive blockchain for decentralized data storage and transactions
-- dbuzz platform for social interactions and content sharing
-- Hive Keychain for secure authentication and transactions
-- Axios for API requests
-
-## Project Status
-See our [TODO.md](TODO.md) file for upcoming features and improvements.
-
-## Contributing
-Contributions are welcome! Please read our [CONTRIBUTING.md](CONTRIBUTING.md) file for details on how to submit pull requests.
-
-### Code Style Guidelines
-- Use consistent indentation (2 spaces)
-- Write clear comments for complex logic
-- Follow React best practices
-- Make sure all components are properly documented
-
 ## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Hackathon Submission Requirements
-When submitting this project for the Hive Track Prize Pool, ensure you include:
-1. Team Name: VKrishna Dev Team
-2. Project Name: HiveBuzz
-3. Github Repository link
-4. Video recording of Working Demo
-5. Website link (if deployed)
-6. Detailed explanation of the project idea and how it works
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgements
-- Hive blockchain developers
+
+- Hive blockchain developers and community
 - dbuzz platform team
 - All contributors to this project
+
+---

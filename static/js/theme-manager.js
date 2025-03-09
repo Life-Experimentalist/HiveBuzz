@@ -187,6 +187,11 @@ class ThemeManager {
 		}
 
 		this.currentMode = isDark ? "dark" : "light";
+
+		// If custom theme is selected, re-apply the custom color to update light/dark variants
+		if (this.currentTheme === "custom") {
+			this.previewCustomColor(this.customColor);
+		}
 	}
 
 	/**

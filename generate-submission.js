@@ -6,7 +6,7 @@ const path = require("path");
 
 const TEAM_NAME = "VKrishna Dev Team";
 const PROJECT_NAME = "HiveBuzz";
-const GITHUB_REPO = "https://github.com/YOUR-USERNAME/HiveBuzz"; // Update with your repo
+const GITHUB_REPO = "https://github.com/Life-Experimentalist/HiveBuzz"; // Update with your repo
 const DEMO_VIDEO = "https://youtu.be/YOUR-VIDEO-ID"; // Update with your demo video
 const WEBSITE_URL = ""; // Fill if deployed
 
