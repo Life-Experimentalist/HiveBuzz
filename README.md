@@ -29,6 +29,23 @@ HiveBuzz is a decentralized social media application built on the Hive blockchai
 	- Content caching for improved performance
 	- Post and comment rendering with markdown support
 
+## Website for HiveBuzz
+- **FullFills the Three Main Criteria's:**
+
+1. *Login* using Hive Keychain, Hive Signer, or Hive Auth.
+
+![alt text](auth1.jpg)
+
+2. *Broadcasting transactions* on the Hive chain.
+
+![alt text](transaction3.jpg)
+
+3. *Reading transactions* from the Hive chain.
+
+![alt text](data2.jpg)
+
+
+
 ## Hive APIs Used
 
 HiveBuzz leverages multiple Hive blockchain APIs for additional functionality:
