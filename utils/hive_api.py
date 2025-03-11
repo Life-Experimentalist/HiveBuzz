@@ -207,6 +207,11 @@ class HiveAPI:
                         logger.info(
                             f"Returning {len(result)} formatted posts from blockchain"
                         )
+
+                        # Add a field to indicate these are fresh blockchain posts
+                        for post in result:
+                            post["from_blockchain"] = True
+
                         return result
                     except Exception as e:
                         logger.error(f"Error with beem Discussions: {e}")
@@ -244,6 +249,11 @@ class HiveAPI:
                                     result.append(formatted_post)
 
                         logger.info(f"Returning {len(result)} posts from REST API")
+
+                        # Add a field to indicate these are fresh blockchain posts
+                        for post in result:
+                            post["from_blockchain"] = True
+
                         return result
                     else:
                         logger.error(
@@ -1675,10 +1685,9 @@ class HiveAPI:
                             comments.append(comment)
             else:
                 # Use Beem for better performance
-                from beem.discussions import Query, Discussions
-
                 # Create a dummy Comment object to get replies
                 from beem.comment import Comment
+                from beem.discussions import Discussions, Query
 
                 post = Comment(f"@{author}/{permlink}", blockchain_instance=self.hive)
 

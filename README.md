@@ -1,6 +1,64 @@
 # HiveBuzz
 
-A Flask-based web application providing a seamless interface for the Hive blockchain, enabling users to authenticate, view content, and broadcast transactions.
+A modern interface for interacting with the Hive blockchain.
+
+## Service Previews
+
+HiveBuzz supports automatic service previews for pull requests using Render. This allows you to preview changes before merging them into the main branch.
+
+### How to Use Service Previews
+
+#### Automatic Previews
+
+By default, all pull requests will generate a service preview. The preview URL will be posted as a comment on your pull request once the deployment is complete.
+
+To skip generating a preview, include one of the following strings in your pull request title:
+- `[skip preview]`
+- `[skip render]`
+- `[preview skip]`
+- `[render skip]`
+
+#### Manual Previews
+
+If manual previews are configured, you need to explicitly request a preview by including `[render preview]` in your pull request title.
+
+#### Using the Preview
+
+Each pull request gets its own isolated preview environment with a unique URL. Preview URLs follow this format:
+```
+https://pr-{PR_NUMBER}.hivebuzz.onrender.com
+```
+
+Preview environments have the following characteristics:
+- They use the same configuration as the main deployment (environment variables, etc.)
+- They are automatically updated when you push new commits to the PR
+- They are automatically deleted when the PR is merged or closed
+
+### For Developers
+
+Preview environments set the `IS_PULL_REQUEST` environment variable to `true`, which your code can detect to modify behavior specifically for previews.
+
+Example:
+```python
+import os
+
+# Check if running in a preview environment
+is_preview = os.environ.get('IS_PULL_REQUEST') == 'true'
+
+if is_preview:
+    # Use test database or mock services
+    DATABASE_URL = os.environ.get('TEST_DATABASE_URL')
+else:
+    # Use production database
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+```
+
+## Additional Documentation
+
+For more information about HiveBuzz, please see the following resources:
+- [Installation Guide](./docs/installation.md)
+- [API Documentation](./docs/api.md)
+- [Contributing Guidelines](./CONTRIBUTING.md)
 
 ## Overview
 

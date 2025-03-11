@@ -21,7 +21,7 @@ class Config:
     SESSION_PERMANENT = True
 
     # Application URLs
-    APP_URL = os.getenv("APP_URL", "http://localhost:5000")
+    APP_URL = os.getenv("APP_URL", "https://hivebuzz.onrender.com")
 
     # HiveSigner Configuration
     HIVESIGNER_APP_NAME = os.getenv("HIVESIGNER_APP_NAME", "HiveBuzz")
@@ -29,7 +29,7 @@ class Config:
     HIVESIGNER_APP_HOST = os.getenv("HIVESIGNER_APP_HOST", "https://hivesigner.com")
     HIVESIGNER_REDIRECT_URI = os.getenv(
         "HIVESIGNER_REDIRECT_URI",
-        f"{os.getenv('APP_URL', 'http://localhost:5000')}/hivesigner/callback",
+        "https://hivebuzz.onrender.com/hivesigner/callback",
     )
     HIVESIGNER_SCOPE = os.getenv("HIVESIGNER_SCOPE", "login")
 

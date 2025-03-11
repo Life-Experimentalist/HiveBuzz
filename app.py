@@ -548,8 +548,12 @@ def posts():
                 "initializing": is_initializing,
                 "message": f"Loading {feed_type} posts...",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
+                "no_refresh": True,
             }
         )
+
+    # Always set no_auto_refresh to True for the posts page
+    no_auto_refresh = True
 
     # Fetch posts from cache with non-blocking approach
     try:
@@ -601,6 +605,7 @@ def posts():
         is_cache_fresh=is_cache_fresh,
         cache_refreshing=cache_initializing,
         is_feed_initializing=is_initializing,
+        no_auto_refresh=no_auto_refresh,
     )
 
 
@@ -1502,7 +1507,8 @@ def inject_config():
 
 @app.context_processor
 def inject_now():
-    return {"now": datetime.utcnow()}
+    """Inject current UTC time into templates using timezone-aware datetime"""
+    return {"now": datetime.now(timezone.utc)}
 
 
 @app.errorhandler(404)
@@ -1547,6 +1553,12 @@ def api_status():
         # Get detailed cache status
         cache_status = posts_cache.get_cache_status()
 
+        # Add a timestamp to prevent browser caching
+        current_time = datetime.now(timezone.utc).isoformat()
+
+        # Check if this request should not trigger a page reload
+        no_reload = request.headers.get("X-No-Refresh") == "true"
+
         return jsonify(
             {
                 "initialized": hive_api_client.initialized,
@@ -1557,12 +1569,20 @@ def api_status():
                 "cache": cache_status,
                 "cache_initialized": posts_cache._startup_complete,
                 "priority_feeds_loaded": posts_cache.initialized,
+                "timestamp": current_time,  # Add timestamp to prevent caching
+                "no_reload": no_reload,  # Flag to prevent reload
             }
         )
     except Exception as e:
         return (
             jsonify(
-                {"error": str(e), "initialized": False, "cache_initialized": False}
+                {
+                    "error": str(e),
+                    "initialized": False,
+                    "cache_initialized": False,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "no_reload": True,
+                }
             ),
             500,
         )
@@ -1574,30 +1594,51 @@ def api_posts():
     feed_type = request.args.get("feed", "trending")
     tag = request.args.get("tag")
     page = int(request.args.get("page", 1))
+    limit = int(
+        request.args.get("limit", 20)
+    )  # Default to 20 posts per page, but allow custom limits
 
     try:
         # For page 1, use the cache
         if page == 1:
-            posts_data = posts_cache.get_posts(feed_type=feed_type, tag=tag, limit=20)
+            posts_data = posts_cache.get_posts(
+                feed_type=feed_type, tag=tag, limit=limit
+            )
         else:
             # For additional pages, we'd need to fetch from the API
             # This is a simplified version - ideally we'd cache multiple pages
             hive_api_client = get_initialized_api()
 
             if feed_type == "trending":
-                posts_data = hive_api_client.get_trending_posts(limit=20, tag=tag)
+                posts_data = hive_api_client.get_trending_posts(limit=limit, tag=tag)
             elif feed_type == "created" or feed_type == "new":
-                posts_data = hive_api_client.get_trending_posts(limit=20, tag=tag)
+                posts_data = hive_api_client.get_trending_posts(limit=limit, tag=tag)
                 posts_data.sort(key=lambda post: post.get("created", ""), reverse=True)
             elif feed_type == "hot":
-                posts_data = hive_api_client.get_trending_posts(limit=20, tag=tag)
+                posts_data = hive_api_client.get_trending_posts(limit=limit, tag=tag)
             elif feed_type == "promoted":
-                posts_data = hive_api_client.get_trending_posts(limit=20, tag=tag)
+                posts_data = hive_api_client.get_trending_posts(limit=limit, tag=tag)
             else:
-                posts_data = hive_api_client.get_trending_posts(limit=20, tag=tag)
+                posts_data = hive_api_client.get_trending_posts(limit=limit, tag=tag)
 
-        # Return the posts
-        return jsonify({"posts": posts_data, "hasMore": len(posts_data) >= 20})
+        # Make sure all posts have an ID
+        for i, post in enumerate(posts_data):
+            if "id" not in post or not post["id"]:
+                # Create a unique ID based on author and permlink
+                if "author" in post and "permlink" in post:
+                    post["id"] = f"{post['author']}-{post['permlink']}"
+                else:
+                    # Fallback to a position-based ID
+                    post["id"] = f"post-{int(time.time())}-{i}"
+
+        # Return the posts with a hasMore flag that indicates if there are likely more posts to load
+        return jsonify(
+            {
+                "posts": posts_data,
+                "hasMore": len(posts_data) >= limit,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
     except Exception as e:
         logger.error(f"API error fetching posts: {e}")
@@ -1669,11 +1710,17 @@ def cleanup_on_exit():
     # Stop the posts cache refresh thread first
     if "posts_cache" in globals():
         logger.info("Stopping posts cache refresh thread...")
+
+        # First save all caches to disk
+        logger.info("Saving all post caches to disk...")
+        posts_cache.save_all_caches()
+
+        # Then stop the thread
         posts_cache.stop()
 
     logger.info("Application shutdown complete")
 
-
+# Make sure the cleanup function is registered
 atexit.register(cleanup_on_exit)
 
 @app.template_filter("markdown")
@@ -1789,15 +1836,66 @@ def get_new_posts_api():
     """API endpoint to get new posts"""
     feed_type = request.args.get("feed", "trending")
     tag = request.args.get("tag")
+    after = request.args.get("after", "")  # Get post ID to fetch posts after this one
+    new_only = (
+        request.args.get("new_only") == "true"
+    )  # Whether to return only new posts
 
     try:
-        # Replace this with your actual logic to fetch new posts from the Hive blockchain
-        new_posts = get_new_posts_from_blockchain(feed_type, tag)
-        return jsonify({"posts": new_posts})
+        # Get posts from cache based on the request type
+        if new_only:
+            new_posts = posts_cache.get_posts(
+                feed_type=feed_type, tag=tag, limit=25, new_only=True
+            )
+        else:
+            # Get all posts (including new ones)
+            new_posts = posts_cache.get_posts(
+                feed_type=feed_type, tag=tag, limit=25, include_new=True
+            )
+
+        # Make sure posts have IDs - add IDs if missing
+        for i, post in enumerate(new_posts):
+            if "id" not in post or not post["id"]:
+                # Generate a unique ID based on author and permlink if available
+                if "author" in post and "permlink" in post:
+                    post["id"] = f"{post['author']}-{post['permlink']}"
+                else:
+                    # Fallback to a random ID
+                    post["id"] = f"post-{int(time.time())}-{i}"
+
+        # If we have an 'after' parameter, only return posts newer than that one
+        if after and new_posts:
+            # Since posts are typically ordered by recency, we can just find
+            # the index of the specified post and return everything before it
+            try:
+                for idx, post in enumerate(new_posts):
+                    if post["id"] == after:
+                        new_posts = new_posts[:idx]
+                        break
+            except Exception as e:
+                logger.error(f"Error filtering posts by 'after' parameter: {e}")
+
+        # Log count for debugging
+        logger.info(f"Returning {len(new_posts)} new posts for {feed_type} feed")
+
+        return jsonify(
+            {
+                "posts": new_posts,
+                "hasMore": len(new_posts) > 0,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
     except Exception as e:
         logger.error(f"Error fetching new posts: {e}")
-        return jsonify({"error": str(e), "posts": []})
+        return jsonify(
+            {
+                "error": str(e),
+                "posts": [],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
+# ...existing code...
 
 def get_new_posts_from_blockchain(feed_type, tag):
     """Dummy function to simulate fetching new posts from the Hive blockchain"""
@@ -1817,6 +1915,100 @@ def get_new_posts_from_blockchain(feed_type, tag):
             "comment_count": 2,
         }
     ]
+
+
+@app.route("/api/posts/check")
+def check_new_posts():
+    """Check if there are new posts available"""
+    feed_type = request.args.get("feed", "trending")
+    tag = request.args.get("tag")
+
+    try:
+        # Get the number of new posts
+        new_count = posts_cache.get_new_post_count(feed_type, tag)
+
+        return jsonify(
+            {
+                "new_count": new_count,
+                "feed_type": feed_type,
+                "tag": tag,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error checking for new posts: {e}")
+        return (
+            jsonify(
+                {
+                    "error": str(e),
+                    "new_count": 0,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            ),
+            500,
+        )
+
+
+@app.route("/api/posts/merge", methods=["POST"])
+def merge_new_posts():
+    """Merge new posts into the main posts list"""
+    feed_type = request.args.get("feed", "trending")
+    tag = request.args.get("tag")
+
+    try:
+        # Merge new posts into the main list
+        merged_count = posts_cache.merge_new_posts(feed_type, tag)
+
+        return jsonify(
+            {
+                "merged_count": merged_count,
+                "feed_type": feed_type,
+                "tag": tag,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error merging new posts: {e}")
+        return (
+            jsonify(
+                {
+                    "error": str(e),
+                    "merged_count": 0,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            ),
+            500,
+        )
+
+
+@app.after_request
+def add_no_refresh_headers(response):
+    """Add headers to prevent caching and auto-refresh for specific pages"""
+    # Get the current path
+    path = request.path
+
+    # Check if this is a no-refresh page
+    no_refresh_paths = ["/posts", "/post/"]
+    is_no_refresh_page = any(path.startswith(p) for p in no_refresh_paths)
+
+    # Add Cache-Control headers for API endpoints
+    if path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+
+        # For API status check with X-No-Refresh header, add special header
+        if path == "/api/status" and request.headers.get("X-No-Refresh") == "true":
+            response.headers["X-No-Reload"] = "true"
+
+    # For no-refresh pages
+    if is_no_refresh_page:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        response.headers["X-No-Reload"] = "true"
+
+    return response
 
 
 if __name__ == "__main__":

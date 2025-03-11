@@ -9,7 +9,7 @@ import os
 import threading
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from utils.hive_api import get_hive_api
 
@@ -21,7 +21,7 @@ DEFAULT_REFRESH_INTERVAL = 300  # 5 minutes in seconds
 DEFAULT_CACHE_SIZE = 50  # Number of posts to cache per feed type
 STARTUP_PRIORITY_FEEDS = ["trending", "hot"]  # Load these first during startup
 DEFAULT_CACHE_DIR = "cache/posts"  # Directory to store persistent cache files
-MAX_CACHE_AGE = 3600  # Maximum age of cache files in seconds (1 hour)
+MAX_CACHE_AGE = 3600 * 12  # Maximum age of cache files in seconds (12 hours)
 
 
 class PostsCache:
@@ -45,10 +45,30 @@ class PostsCache:
         self.refresh_interval = refresh_interval
         self.cache_dir = cache_dir
         self.cache: Dict[str, Dict] = {
-            "trending": {"posts": [], "last_updated": None, "updating": False},
-            "hot": {"posts": [], "last_updated": None, "updating": False},
-            "new": {"posts": [], "last_updated": None, "updating": False},
-            "promoted": {"posts": [], "last_updated": None, "updating": False},
+            "trending": {
+                "posts": [],
+                "last_updated": None,
+                "updating": False,
+                "new_posts": [],
+            },
+            "hot": {
+                "posts": [],
+                "last_updated": None,
+                "updating": False,
+                "new_posts": [],
+            },
+            "new": {
+                "posts": [],
+                "last_updated": None,
+                "updating": False,
+                "new_posts": [],
+            },
+            "promoted": {
+                "posts": [],
+                "last_updated": None,
+                "updating": False,
+                "new_posts": [],
+            },
         }
         self.tag_cache: Dict[str, Dict] = {}  # For caching tag-specific feeds
         self.refresh_thread = None
@@ -56,6 +76,14 @@ class PostsCache:
         self.initialized = False
         self.event = threading.Event()  # For signaling startup completion
         self._startup_complete = False  # Flag for tracking startup status
+        self.post_ids_seen: Dict[str, Set[str]] = (
+            {  # Track post IDs to detect new posts
+                "trending": set(),
+                "hot": set(),
+                "new": set(),
+                "promoted": set(),
+            }
+        )
 
         # Ensure cache directory exists
         self._ensure_cache_dir()
@@ -128,15 +156,36 @@ class PostsCache:
                         "posts": [],
                         "last_updated": None,
                         "updating": False,
+                        "new_posts": [],
                     }
                 self.tag_cache[cache_key]["posts"] = cache_data["posts"]
                 self.tag_cache[cache_key]["last_updated"] = datetime.fromisoformat(
                     cache_data["last_updated"]
                 )
+
+                # Initialize the post ID tracking for this feed
+                if "post_ids" in cache_data:
+                    # Create tag-specific ID set if needed
+                    if tag not in self.post_ids_seen:
+                        self.post_ids_seen[cache_key] = set()
+                    self.post_ids_seen[cache_key] = set(cache_data["post_ids"])
             else:
                 self.cache[feed_type]["posts"] = cache_data["posts"]
                 self.cache[feed_type]["last_updated"] = datetime.fromisoformat(
                     cache_data["last_updated"]
+                )
+
+                # Initialize the post ID tracking for this feed
+                if "post_ids" in cache_data:
+                    self.post_ids_seen[feed_type] = set(cache_data["post_ids"])
+                else:
+                    # Build ID set from posts
+                    self.post_ids_seen[feed_type] = set(
+                        post["id"] for post in cache_data["posts"] if "id" in post
+                    )
+
+                logger.debug(
+                    f"Loaded {len(self.post_ids_seen[feed_type])} post IDs for {feed_type}"
                 )
 
             logger.info(
@@ -157,11 +206,11 @@ class PostsCache:
             tag: Optional tag
         """
         cache_file = self._get_cache_file_path(feed_type, tag)
+        cache_key = f"{feed_type}_{tag}" if tag else feed_type
 
         try:
             # Get cache data
             if tag:
-                cache_key = f"{feed_type}_{tag}"
                 if (
                     cache_key not in self.tag_cache
                     or not self.tag_cache[cache_key]["posts"]
@@ -169,15 +218,27 @@ class PostsCache:
                     return
                 posts = self.tag_cache[cache_key]["posts"]
                 last_updated = self.tag_cache[cache_key]["last_updated"]
+                # Also save any new posts that haven't been merged yet
+                new_posts = self.tag_cache[cache_key].get("new_posts", [])
+
+                # Get post IDs for this tag feed
+                post_ids = set(post["id"] for post in posts if "id" in post)
+                post_ids.update(post["id"] for post in new_posts if "id" in post)
             else:
                 if feed_type not in self.cache or not self.cache[feed_type]["posts"]:
                     return
                 posts = self.cache[feed_type]["posts"]
                 last_updated = self.cache[feed_type]["last_updated"]
+                # Also save any new posts that haven't been merged yet
+                new_posts = self.cache[feed_type].get("new_posts", [])
+
+                # Get post IDs for this feed
+                post_ids = self.post_ids_seen.get(feed_type, set())
 
             # Create cache data dict
             cache_data = {
                 "posts": posts,
+                "new_posts": new_posts,
                 "last_updated": (
                     last_updated.isoformat()
                     if last_updated
@@ -186,13 +247,19 @@ class PostsCache:
                 "feed_type": feed_type,
                 "tag": tag,
                 "count": len(posts),
+                "new_count": len(new_posts),
+                "post_ids": list(
+                    post_ids
+                ),  # Save post IDs for detecting new posts later
             }
 
             # Write to file
             with open(cache_file, "w", encoding="utf-8") as f:
                 json.dump(cache_data, f, ensure_ascii=False, indent=2)
 
-            logger.info(f"Saved {len(posts)} posts to cache file {cache_file}")
+            logger.info(
+                f"Saved {len(posts)} posts and {len(new_posts)} new posts to cache file {cache_file}"
+            )
 
         except (IOError, TypeError) as e:
             logger.error(f"Error saving cache to file {cache_file}: {e}")
@@ -204,8 +271,22 @@ class PostsCache:
 
             # First, try to load cached data from files
             logger.info("Loading cached posts from disk")
+            cached_feeds_count = 0
             for feed_type in self.cache.keys():
-                self._load_cache_from_file(feed_type)
+                if self._load_cache_from_file(feed_type):
+                    cached_feeds_count += 1
+                    logger.info(f"Successfully loaded {feed_type} feed from cache")
+                else:
+                    logger.info(f"No valid cache found for {feed_type} feed")
+
+            if cached_feeds_count > 0:
+                logger.info(f"Loaded {cached_feeds_count} feeds from cache")
+                # Mark as partially initialized so UI can show something
+                self.initialized = True
+            else:
+                logger.warning(
+                    "No valid cache files found, will initialize from blockchain"
+                )
 
             # Instead of blocking on priority feeds, launch them in background
             logger.info("Starting background priority feed refresh")
@@ -225,12 +306,26 @@ class PostsCache:
             logger.info("Posts cache background refresh started")
 
     def _load_priority_feeds(self) -> None:
-        """Load high priority feeds synchronously during startup"""
+        """Load high priority feeds during startup"""
         try:
             # First try to load trending posts as these are most commonly needed
             for feed_type in STARTUP_PRIORITY_FEEDS:
-                logger.info(f"Loading priority feed: {feed_type}")
-                self._refresh_feed(feed_type, None, block=True)
+                logger.info(f"Refreshing priority feed: {feed_type}")
+
+                # Check if we already have cached data
+                cached_posts = len(self.cache[feed_type]["posts"])
+                if cached_posts > 0:
+                    logger.info(
+                        f"Already have {cached_posts} cached posts for {feed_type}, refreshing in background"
+                    )
+                    # Non-blocking refresh if we already have some cached data
+                    self._refresh_feed(feed_type, None, block=False)
+                else:
+                    # Block only if we have no cached data for this feed
+                    logger.info(
+                        f"No cached posts for {feed_type}, blocking until loaded"
+                    )
+                    self._refresh_feed(feed_type, None, block=True)
 
             # Mark as initialized even if we only have some content
             self.initialized = True
@@ -269,6 +364,8 @@ class PostsCache:
         tag: Optional[str] = None,
         limit: int = 20,
         timeout: Optional[float] = None,
+        include_new: bool = False,
+        new_only: bool = False,
     ) -> List[Dict]:
         """
         Get posts from the cache for the specified feed type and tag
@@ -278,15 +375,28 @@ class PostsCache:
             tag: Optional tag to filter posts
             limit: Number of posts to return
             timeout: Maximum time to wait for posts in seconds (None for no timeout)
+            include_new: Whether to include new posts (those not merged into main list yet)
+            new_only: Whether to return only new posts
 
         Returns:
             List of post dictionaries
         """
+        # Add a cache staleness check flag - but don't force reload
+        self._check_cache_freshness(feed_type, tag, force_reload=False)
+
         # For tag-specific feeds, use the tag cache or fallback to filtering the main feed
         if tag:
             cache_key = f"{feed_type}_{tag}"
             if cache_key in self.tag_cache and self.tag_cache[cache_key]["posts"]:
-                posts = self.tag_cache[cache_key]["posts"]
+                if new_only:
+                    posts = self.tag_cache[cache_key].get("new_posts", [])
+                elif include_new:
+                    posts = self.tag_cache[cache_key]["posts"] + self.tag_cache[
+                        cache_key
+                    ].get("new_posts", [])
+                else:
+                    posts = self.tag_cache[cache_key]["posts"]
+
                 # If the tag cache is stale (>10 min), trigger a refresh
                 if (
                     self.tag_cache[cache_key]["last_updated"] is None
@@ -315,6 +425,7 @@ class PostsCache:
                     if cache_key not in self.tag_cache:
                         self.tag_cache[cache_key] = {
                             "posts": [],
+                            "new_posts": [],
                             "last_updated": None,
                             "updating": False,
                         }
@@ -326,7 +437,18 @@ class PostsCache:
                     ).start()
         else:
             # For main feeds, use the main cache
-            posts = self.cache.get(feed_type, {"posts": []})["posts"]
+            if new_only:
+                posts = self.cache.get(feed_type, {"new_posts": []}).get(
+                    "new_posts", []
+                )
+            elif include_new:
+                main_posts = self.cache.get(feed_type, {"posts": []})["posts"]
+                new_posts = self.cache.get(feed_type, {"new_posts": []}).get(
+                    "new_posts", []
+                )
+                posts = main_posts + new_posts
+            else:
+                posts = self.cache.get(feed_type, {"posts": []})["posts"]
 
             # Non-blocking wait with timeout if specified
             if timeout is not None and not posts and self.cache[feed_type]["updating"]:
@@ -441,6 +563,8 @@ class PostsCache:
         """
         # Get the appropriate cache (main feed or tag-specific)
         cache_key = f"{feed_type}_{tag}" if tag else feed_type
+        id_set_key = cache_key if tag else feed_type
+
         cache_dict = (
             self.tag_cache.get(cache_key, {}) if tag else self.cache.get(feed_type, {})
         )
@@ -453,10 +577,15 @@ class PostsCache:
             if cache_key not in self.tag_cache:
                 self.tag_cache[cache_key] = {
                     "posts": [],
+                    "new_posts": [],
                     "last_updated": None,
                     "updating": False,
                 }
             cache_dict = self.tag_cache[cache_key]
+
+            # Initialize ID set for tag if needed
+            if cache_key not in self.post_ids_seen:
+                self.post_ids_seen[cache_key] = set()
 
         # Mark as updating
         cache_dict["updating"] = True
@@ -496,20 +625,64 @@ class PostsCache:
 
             # Update the cache if we got valid posts
             if posts:
+                # Get current post IDs
+                current_ids = set(self.post_ids_seen.get(id_set_key, set()))
+
+                # Identify new posts
+                new_posts = []
+                for post in posts:
+                    # Make sure post has an ID
+                    if "id" not in post or not post["id"]:
+                        # Create a unique ID if missing
+                        if "author" in post and "permlink" in post:
+                            post["id"] = f"{post['author']}-{post['permlink']}"
+                        else:
+                            post["id"] = f"post-{int(time.time())}-{id(post)}"
+
+                    # Check if we've seen this post before
+                    if post["id"] not in current_ids:
+                        new_posts.append(post)
+                        current_ids.add(post["id"])
+
+                # Update our tracking set
+                self.post_ids_seen[id_set_key] = current_ids
+
                 if tag:
-                    self.tag_cache[cache_key]["posts"] = posts
+                    # Add new posts to the new_posts list
+                    if new_posts and not self._startup_complete:
+                        # During startup, just add everything to main posts
+                        self.tag_cache[cache_key]["posts"] = posts
+                    else:
+                        # After startup, separate new posts
+                        existing_new_posts = self.tag_cache[cache_key].get(
+                            "new_posts", []
+                        )
+                        self.tag_cache[cache_key]["new_posts"] = (
+                            existing_new_posts + new_posts
+                        )
+
                     self.tag_cache[cache_key]["last_updated"] = datetime.now()
                     # Save tag-specific cache to file
                     self._save_cache_to_file(feed_type, tag)
                 else:
-                    self.cache[feed_type]["posts"] = posts
+                    # Add new posts to the new_posts list
+                    if new_posts and not self._startup_complete:
+                        # During startup, just add everything to main posts
+                        self.cache[feed_type]["posts"] = posts
+                    else:
+                        # After startup, separate new posts
+                        existing_new_posts = self.cache[feed_type].get("new_posts", [])
+                        self.cache[feed_type]["new_posts"] = (
+                            existing_new_posts + new_posts
+                        )
+
                     self.cache[feed_type]["last_updated"] = datetime.now()
                     # Save main feed cache to file
                     self._save_cache_to_file(feed_type)
 
                 duration = time.time() - start_time
                 logger.info(
-                    f"Updated {cache_key} posts cache with {len(posts)} posts in {duration:.2f}s"
+                    f"Updated {cache_key} posts cache with {len(posts)} posts ({len(new_posts)} new) in {duration:.2f}s"
                 )
             else:
                 logger.warning(
@@ -524,6 +697,79 @@ class PostsCache:
                 self.tag_cache[cache_key]["updating"] = False
             else:
                 self.cache[feed_type]["updating"] = False
+
+    def merge_new_posts(self, feed_type: str, tag: Optional[str] = None) -> int:
+        """
+        Merge new posts into the main posts list and clear the new posts list
+
+        Args:
+            feed_type: Type of feed
+            tag: Optional tag
+
+        Returns:
+            Number of posts merged
+        """
+        cache_key = f"{feed_type}_{tag}" if tag else feed_type
+        cache_dict = (
+            self.tag_cache.get(cache_key, {}) if tag else self.cache.get(feed_type, {})
+        )
+
+        if not cache_dict:
+            return 0
+
+        new_posts = cache_dict.get("new_posts", [])
+        if not new_posts:
+            return 0
+
+        # Move new posts to the beginning of the main posts list
+        cache_dict["posts"] = new_posts + cache_dict["posts"]
+
+        # Clear new posts list
+        cache_dict["new_posts"] = []
+
+        # Save changes to file
+        self._save_cache_to_file(feed_type, tag)
+
+        logger.info(f"Merged {len(new_posts)} new posts into {cache_key}")
+        return len(new_posts)
+
+    def get_new_post_count(self, feed_type: str, tag: Optional[str] = None) -> int:
+        """
+        Get the number of new posts available for the specified feed
+
+        Args:
+            feed_type: Type of feed
+            tag: Optional tag
+
+        Returns:
+            Number of new posts available
+        """
+        cache_key = f"{feed_type}_{tag}" if tag else feed_type
+        cache_dict = (
+            self.tag_cache.get(cache_key, {}) if tag else self.cache.get(feed_type, {})
+        )
+
+        if not cache_dict:
+            return 0
+
+        return len(cache_dict.get("new_posts", []))
+
+    def save_all_caches(self) -> None:
+        """Save all caches to disk - typically called when shutting down"""
+        logger.info("Saving all caches to disk...")
+
+        # Save main feeds
+        for feed_type in self.cache.keys():
+            self._save_cache_to_file(feed_type)
+
+        # Save tag feeds
+        for cache_key in list(self.tag_cache.keys()):
+            # Parse feed type and tag from cache key
+            if "_" in cache_key:
+                feed_type, tag = cache_key.split("_", 1)
+                self._save_cache_to_file(feed_type, tag)
+
+        logger.info("All caches saved")
 
     def _cleanup_tag_cache(self) -> None:
         """Remove old tag caches to prevent memory bloat"""
@@ -667,6 +913,13 @@ class PostsCache:
 
         logger.info(f"Cleared {deleted_count} cache files")
         return deleted_count
+
+    def _check_cache_freshness(self, feed_type, tag=None, force_reload=False):
+        # Ensure we don't force reloads automatically
+        if force_reload:
+            logger.debug(f"Force reload requested for {feed_type}")
+        else:
+            logger.debug(f"Checking cache freshness for {feed_type} (no force reload)")
 
 
 # Create a global instance for app-wide use
